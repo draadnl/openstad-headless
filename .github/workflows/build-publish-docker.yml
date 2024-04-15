@@ -54,9 +54,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - run: echo "GH_IMAGE=${{ steps.meta.outputs.image }}" << $GITHUB_ENV
-      - run: echo "GH_BRANCH=${{ github.branch }}" << $GITHUB_ENV
-
       - name: Build image and push to GitHub Container Registry
         id: docker_build
         uses: docker/build-push-action@v5
@@ -64,8 +61,8 @@ jobs:
           context: .
           push: true
           tags: 'ghcr.io/${{ steps.meta.outputs.tags }}'
-          cache-from: 'type=registry,ref=ghcr.io/${{ env.GH_IMAGE }}:cache-${{ env.GH_BRANCH }}'
-          cache-to: 'type=registry,ref=ghcr.io/${{ env.GH_IMAGE }}:cache-${{ env.GH_BRANCH }},mode=max'
+          cache-from: type=registry,ref=ghcr.io/${{ steps.meta.outputs.image }}:cache-${{ env.GITHUB_REF }}
+          cache-to: type=registry,ref=ghcr.io/${{ steps.meta.outputs.image }}:cache-${{ env.GITHUB_REF }},mode=max
           build-args: |
             APP=${{ matrix.app }}
       - name: Add image output
