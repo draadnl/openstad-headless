@@ -61,6 +61,8 @@ jobs:
           context: .
           push: true
           tags: 'ghcr.io/${{ steps.meta.outputs.tags }}'
+          cache-from: type=registry,ref=ghcr.io/${{ steps.meta.outputs.image }}:cache-${{ github.branch }}
+          cache-to: type=registry,ref=ghcr.io/${{ steps.meta.outputs.image }}:cache-${{ github.branch }},mode=max
           build-args: |
             APP=${{ matrix.app }}
       - name: Add image output
