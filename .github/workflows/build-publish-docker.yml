@@ -54,6 +54,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - run: "echo type=registry,ref=ghcr.io/${{ steps.meta.outputs.image }}:cache-${{ github.branch }},mode=max"
+
       - name: Build image and push to GitHub Container Registry
         id: docker_build
         uses: docker/build-push-action@v5
