@@ -18,274 +18,34 @@ entries:
     version: 2.0.38
   - apiVersion: v2
     appVersion: 0.0.1
-    created: "2025-10-09T13:32:35.39191+02:00"
+    created: "2025-10-09T16:41:01.440799+02:00"
     dependencies:
     - name: common
       repository: https://charts.bitnami.com/bitnami
       version: 2.0.3
     description: Openstad Headless Helm chart for Kubernetes
-    digest: 59d92607e4d82b97c2ebdba777a566410034b18270c2dcc61b72816e5f1d5625
+    digest: 5c4bcb6f137d5c1a6391ee84271fd5e5c420ba51c462c35696a08bd01c6f03d1
     icon: https://avatars.githubusercontent.com/u/99011277?s=200&v=4
     name: openstad-headless
     type: application
     urls:
-    - https://github.com/draadnl/openstad-headless/releases/download/openstad-headless-2.0.38-alpha.22/openstad-headless-2.0.38-alpha.22.tgz
-    version: 2.0.38-alpha.22
+    - https://github.com/draadnl/openstad-headless/releases/download/openstad-headless-2.0.38-alpha.24/openstad-headless-2.0.38-alpha.24.tgz
+    version: 2.0.38-alpha.24
   - apiVersion: v2
     appVersion: 0.0.1
-    created: "2025-10-09T13:32:35.214755+02:00"
+    created: "2025-10-09T16:41:01.252392+02:00"
     dependencies:
     - name: common
       repository: https://charts.bitnami.com/bitnami
       version: 2.0.3
     description: Openstad Headless Helm chart for Kubernetes
-    digest: 143d76ed70c7b5e438a10aedec7daa52a9a07b367d1388b6fbb75552c2cda716
+    digest: 867364050c4757768851a4fde202f8cb5a97437b6961bc8f93da2a5d2d7fb5cb
     icon: https://avatars.githubusercontent.com/u/99011277?s=200&v=4
     name: openstad-headless
     type: application
     urls:
-    - https://github.com/draadnl/openstad-headless/releases/download/openstad-headless-2.0.38-alpha.21/openstad-headless-2.0.38-alpha.21.tgz
-    version: 2.0.38-alpha.21
-  - apiVersion: v2
-    appVersion: 0.0.1
-    created: "2025-10-09T13:32:35.049068+02:00"
-    dependencies:
-    - name: common
-      repository: https://charts.bitnami.com/bitnami
-      version: 2.0.3
-    description: Openstad Headless Helm chart for Kubernetes
-    digest: 1202f15e435c3260a5be412c44e851df05cc8f0f5bc2e446baa21623be4529cf
-    icon: https://avatars.githubusercontent.com/u/99011277?s=200&v=4
-    name: openstad-headless
-    type: application
-    urls:
-    - https://github.com/draadnl/openstad-headless/releases/download/openstad-headless-2.0.38-alpha.20/openstad-headless-2.0.38-alpha.20.tgz
-    version: 2.0.38-alpha.20
-  - apiVersion: v2
-    appVersion: 0.0.1
-    created: "2025-10-09T13:32:34.889969+02:00"
-    dependencies:
-    - name: common
-      repository: https://charts.bitnami.com/bitnami
-      version: 2.0.3
-    description: Openstad Headless Helm chart for Kubernetes
-    digest: 65876f86fb19911f98842ff41dfe05f6f3861ac27010288bbccc12984f2883ff
-    icon: https://avatars.githubusercontent.com/u/99011277?s=200&v=4
-    name: openstad-headless
-    type: application
-    urls:
-    - https://github.com/draadnl/openstad-headless/releases/download/openstad-headless-2.0.38-alpha.19/openstad-headless-2.0.38-alpha.19.tgz
-    version: 2.0.38-alpha.19
-  - apiVersion: v2
-    appVersion: 0.0.1
-    created: "2025-10-09T13:32:34.725705+02:00"
-    dependencies:
-    - name: common
-      repository: https://charts.bitnami.com/bitnami
-      version: 2.0.3
-    description: Openstad Headless Helm chart for Kubernetes
-    digest: 3ad79fda9191a3780c74112ed1b9bbeec8c506926d802247a032b24e201bebde
-    icon: https://avatars.githubusercontent.com/u/99011277?s=200&v=4
-    name: openstad-headless
-    type: application
-    urls:
-    - https://github.com/draadnl/openstad-headless/releases/download/openstad-headless-2.0.38-alpha.18/openstad-headless-2.0.38-alpha.18.tgz
-    version: 2.0.38-alpha.18
-  - apiVersion: v2
-    appVersion: 0.0.1
-    created: "2025-10-09T13:32:34.557524+02:00"
-    dependencies:
-    - name: common
-      repository: https://charts.bitnami.com/bitnami
-      version: 2.0.3
-    description: Openstad Headless Helm chart for Kubernetes
-    digest: 98306f36e48cafc41de617df3aa7baea2b8985fee8ab18b48de0511e9806f4a0
-    icon: https://avatars.githubusercontent.com/u/99011277?s=200&v=4
-    name: openstad-headless
-    type: application
-    urls:
-    - https://github.com/draadnl/openstad-headless/releases/download/openstad-headless-2.0.38-alpha.17/openstad-headless-2.0.38-alpha.17.tgz
-    version: 2.0.38-alpha.17
-  - apiVersion: v2
-    appVersion: 0.0.1
-    created: "2025-10-09T13:32:34.388221+02:00"
-    dependencies:
-    - name: common
-      repository: https://charts.bitnami.com/bitnami
-      version: 2.0.3
-    description: Openstad Headless Helm chart for Kubernetes
-    digest: 62f9289f1f6bb1f8d3980d08f20d1458bf595b204067f21e397e098466610c07
-    icon: https://avatars.githubusercontent.com/u/99011277?s=200&v=4
-    name: openstad-headless
-    type: application
-    urls:
-    - https://github.com/draadnl/openstad-headless/releases/download/openstad-headless-2.0.38-alpha.16/openstad-headless-2.0.38-alpha.16.tgz
-    version: 2.0.38-alpha.16
-  - apiVersion: v2
-    appVersion: 0.0.1
-    created: "2025-10-09T13:32:34.225962+02:00"
-    dependencies:
-    - name: common
-      repository: https://charts.bitnami.com/bitnami
-      version: 2.0.3
-    description: Openstad Headless Helm chart for Kubernetes
-    digest: 958bf1f81769f4d666575c14d2d5a1cab275f357b0a866c10b0e706a4a47d8b8
-    icon: https://avatars.githubusercontent.com/u/99011277?s=200&v=4
-    name: openstad-headless
-    type: application
-    urls:
-    - https://github.com/draadnl/openstad-headless/releases/download/openstad-headless-2.0.38-alpha.15/openstad-headless-2.0.38-alpha.15.tgz
-    version: 2.0.38-alpha.15
-  - apiVersion: v2
-    appVersion: 0.0.1
-    created: "2025-10-09T13:32:34.068049+02:00"
-    dependencies:
-    - name: common
-      repository: https://charts.bitnami.com/bitnami
-      version: 2.0.3
-    description: Openstad Headless Helm chart for Kubernetes
-    digest: 8f49ebf7ab7e07b29317b74080db2c3e3edee9d42e86d7a30530b78255630d3b
-    icon: https://avatars.githubusercontent.com/u/99011277?s=200&v=4
-    name: openstad-headless
-    type: application
-    urls:
-    - https://github.com/draadnl/openstad-headless/releases/download/openstad-headless-2.0.38-alpha.14/openstad-headless-2.0.38-alpha.14.tgz
-    version: 2.0.38-alpha.14
-  - apiVersion: v2
-    appVersion: 0.0.1
-    created: "2025-10-09T13:32:33.89619+02:00"
-    dependencies:
-    - name: common
-      repository: https://charts.bitnami.com/bitnami
-      version: 2.0.3
-    description: Openstad Headless Helm chart for Kubernetes
-    digest: c2ec15a10be16eff5af81f68259d9764b834799bd113c7e9a33ebeb2bbfb859b
-    icon: https://avatars.githubusercontent.com/u/99011277?s=200&v=4
-    name: openstad-headless
-    type: application
-    urls:
-    - https://github.com/draadnl/openstad-headless/releases/download/openstad-headless-2.0.38-alpha.13/openstad-headless-2.0.38-alpha.13.tgz
-    version: 2.0.38-alpha.13
-  - apiVersion: v2
-    appVersion: 0.0.1
-    created: "2025-10-09T13:32:33.706689+02:00"
-    dependencies:
-    - name: common
-      repository: https://charts.bitnami.com/bitnami
-      version: 2.0.3
-    description: Openstad Headless Helm chart for Kubernetes
-    digest: 4271d8286cea3d338af4e1297e4f40ded2ec1548007ae4f1ca7dc58c38532896
-    icon: https://avatars.githubusercontent.com/u/99011277?s=200&v=4
-    name: openstad-headless
-    type: application
-    urls:
-    - https://github.com/draadnl/openstad-headless/releases/download/openstad-headless-2.0.38-alpha.12/openstad-headless-2.0.38-alpha.12.tgz
-    version: 2.0.38-alpha.12
-  - apiVersion: v2
-    appVersion: 0.0.1
-    created: "2025-10-09T13:32:33.534615+02:00"
-    dependencies:
-    - name: common
-      repository: https://charts.bitnami.com/bitnami
-      version: 2.0.3
-    description: Openstad Headless Helm chart for Kubernetes
-    digest: 804cfd7e3498174156be60510adcacf63b051dd330b5038ea5efb73b7b839c38
-    icon: https://avatars.githubusercontent.com/u/99011277?s=200&v=4
-    name: openstad-headless
-    type: application
-    urls:
-    - https://github.com/draadnl/openstad-headless/releases/download/openstad-headless-2.0.38-alpha.10/openstad-headless-2.0.38-alpha.10.tgz
-    version: 2.0.38-alpha.10
-  - apiVersion: v2
-    appVersion: 0.0.1
-    created: "2025-10-09T13:32:36.4441+02:00"
-    dependencies:
-    - name: common
-      repository: https://charts.bitnami.com/bitnami
-      version: 2.0.3
-    description: Openstad Headless Helm chart for Kubernetes
-    digest: 5d43ecff216bef6b8100f659b58309e34b3fee0b3d192e4411677f5272de55c3
-    icon: https://avatars.githubusercontent.com/u/99011277?s=200&v=4
-    name: openstad-headless
-    type: application
-    urls:
-    - https://github.com/draadnl/openstad-headless/releases/download/openstad-headless-2.0.38-alpha.9/openstad-headless-2.0.38-alpha.9.tgz
-    version: 2.0.38-alpha.9
-  - apiVersion: v2
-    appVersion: 0.0.1
-    created: "2025-10-09T13:32:36.262194+02:00"
-    dependencies:
-    - name: common
-      repository: https://charts.bitnami.com/bitnami
-      version: 2.0.3
-    description: Openstad Headless Helm chart for Kubernetes
-    digest: 807bb8ef24c7f7d48a418f545e9f5d81377c878b5fba6159bc0513f7cc0c35d5
-    icon: https://avatars.githubusercontent.com/u/99011277?s=200&v=4
-    name: openstad-headless
-    type: application
-    urls:
-    - https://github.com/draadnl/openstad-headless/releases/download/openstad-headless-2.0.38-alpha.8/openstad-headless-2.0.38-alpha.8.tgz
-    version: 2.0.38-alpha.8
-  - apiVersion: v2
-    appVersion: 0.0.1
-    created: "2025-10-09T13:32:36.085267+02:00"
-    dependencies:
-    - name: common
-      repository: https://charts.bitnami.com/bitnami
-      version: 2.0.3
-    description: Openstad Headless Helm chart for Kubernetes
-    digest: c085e777df98a1e60a23d1f3ecda14df03811ca2640e47f9ed22aedf40a3def0
-    icon: https://avatars.githubusercontent.com/u/99011277?s=200&v=4
-    name: openstad-headless
-    type: application
-    urls:
-    - https://github.com/draadnl/openstad-headless/releases/download/openstad-headless-2.0.38-alpha.7/openstad-headless-2.0.38-alpha.7.tgz
-    version: 2.0.38-alpha.7
-  - apiVersion: v2
-    appVersion: 0.0.1
-    created: "2025-10-09T13:32:35.914432+02:00"
-    dependencies:
-    - name: common
-      repository: https://charts.bitnami.com/bitnami
-      version: 2.0.3
-    description: Openstad Headless Helm chart for Kubernetes
-    digest: 87bb518fe8617007e8c8d107a3ad95d36ead8bca1fe92027a4393443cca6ce1a
-    icon: https://avatars.githubusercontent.com/u/99011277?s=200&v=4
-    name: openstad-headless
-    type: application
-    urls:
-    - https://github.com/draadnl/openstad-headless/releases/download/openstad-headless-2.0.38-alpha.6/openstad-headless-2.0.38-alpha.6.tgz
-    version: 2.0.38-alpha.6
-  - apiVersion: v2
-    appVersion: 0.0.1
-    created: "2025-10-09T13:32:35.752595+02:00"
-    dependencies:
-    - name: common
-      repository: https://charts.bitnami.com/bitnami
-      version: 2.0.3
-    description: Openstad Headless Helm chart for Kubernetes
-    digest: eac284497d59fb3afce594787e6175464424cb005aa03e1032098265e6f0a0b8
-    icon: https://avatars.githubusercontent.com/u/99011277?s=200&v=4
-    name: openstad-headless
-    type: application
-    urls:
-    - https://github.com/draadnl/openstad-headless/releases/download/openstad-headless-2.0.38-alpha.5/openstad-headless-2.0.38-alpha.5.tgz
-    version: 2.0.38-alpha.5
-  - apiVersion: v2
-    appVersion: 0.0.1
-    created: "2025-10-09T13:32:35.544259+02:00"
-    dependencies:
-    - name: common
-      repository: https://charts.bitnami.com/bitnami
-      version: 2.0.3
-    description: Openstad Headless Helm chart for Kubernetes
-    digest: 32aa1a84c5731e1f042db629d4af1443219ed2df866bf5663b75611d87a0a666
-    icon: https://avatars.githubusercontent.com/u/99011277?s=200&v=4
-    name: openstad-headless
-    type: application
-    urls:
-    - https://github.com/draadnl/openstad-headless/releases/download/openstad-headless-2.0.38-alpha.4/openstad-headless-2.0.38-alpha.4.tgz
-    version: 2.0.38-alpha.4
+    - https://github.com/draadnl/openstad-headless/releases/download/openstad-headless-2.0.38-alpha.23/openstad-headless-2.0.38-alpha.23.tgz
+    version: 2.0.38-alpha.23
   - apiVersion: v2
     appVersion: 0.0.1
     created: "2025-09-18T08:16:03.157831401Z"
@@ -808,4 +568,4 @@ entries:
     urls:
     - https://github.com/openstad/openstad-headless/releases/download/openstad-headless-0.0.1/openstad-headless-0.0.1.tgz
     version: 0.0.1
-generated: "2025-10-09T13:32:36.444702+02:00"
+generated: "2025-10-09T16:41:01.440965+02:00"
