@@ -18,13 +18,28 @@ entries:
     version: 2.0.38
   - apiVersion: v2
     appVersion: 0.0.1
-    created: "2025-10-09T09:39:39.25771+02:00"
+    created: "2025-10-09T09:49:03.072526+02:00"
     dependencies:
     - name: common
       repository: https://charts.bitnami.com/bitnami
       version: 2.0.3
     description: Openstad Headless Helm chart for Kubernetes
-    digest: dd967487c5df62695781fed65438a809684ba56aa79bf06083746c70bcaaa08f
+    digest: 62f9289f1f6bb1f8d3980d08f20d1458bf595b204067f21e397e098466610c07
+    icon: https://avatars.githubusercontent.com/u/99011277?s=200&v=4
+    name: openstad-headless
+    type: application
+    urls:
+    - https://github.com/draadnl/openstad-headless/releases/download/openstad-headless-2.0.38-alpha.16/openstad-headless-2.0.38-alpha.16.tgz
+    version: 2.0.38-alpha.16
+  - apiVersion: v2
+    appVersion: 0.0.1
+    created: "2025-10-09T09:49:02.839+02:00"
+    dependencies:
+    - name: common
+      repository: https://charts.bitnami.com/bitnami
+      version: 2.0.3
+    description: Openstad Headless Helm chart for Kubernetes
+    digest: 958bf1f81769f4d666575c14d2d5a1cab275f357b0a866c10b0e706a4a47d8b8
     icon: https://avatars.githubusercontent.com/u/99011277?s=200&v=4
     name: openstad-headless
     type: application
@@ -33,7 +48,7 @@ entries:
     version: 2.0.38-alpha.15
   - apiVersion: v2
     appVersion: 0.0.1
-    created: "2025-10-09T09:39:39.087574+02:00"
+    created: "2025-10-09T09:49:02.66635+02:00"
     dependencies:
     - name: common
       repository: https://charts.bitnami.com/bitnami
@@ -48,7 +63,7 @@ entries:
     version: 2.0.38-alpha.14
   - apiVersion: v2
     appVersion: 0.0.1
-    created: "2025-10-09T09:39:38.929513+02:00"
+    created: "2025-10-09T09:49:02.490963+02:00"
     dependencies:
     - name: common
       repository: https://charts.bitnami.com/bitnami
@@ -63,7 +78,7 @@ entries:
     version: 2.0.38-alpha.13
   - apiVersion: v2
     appVersion: 0.0.1
-    created: "2025-10-09T09:39:38.758124+02:00"
+    created: "2025-10-09T09:49:02.31031+02:00"
     dependencies:
     - name: common
       repository: https://charts.bitnami.com/bitnami
@@ -78,7 +93,7 @@ entries:
     version: 2.0.38-alpha.12
   - apiVersion: v2
     appVersion: 0.0.1
-    created: "2025-10-09T09:39:38.594235+02:00"
+    created: "2025-10-09T09:49:02.151965+02:00"
     dependencies:
     - name: common
       repository: https://charts.bitnami.com/bitnami
@@ -93,7 +108,7 @@ entries:
     version: 2.0.38-alpha.10
   - apiVersion: v2
     appVersion: 0.0.1
-    created: "2025-10-09T09:39:40.27433+02:00"
+    created: "2025-10-09T09:49:04.065369+02:00"
     dependencies:
     - name: common
       repository: https://charts.bitnami.com/bitnami
@@ -108,7 +123,7 @@ entries:
     version: 2.0.38-alpha.9
   - apiVersion: v2
     appVersion: 0.0.1
-    created: "2025-10-09T09:39:40.104906+02:00"
+    created: "2025-10-09T09:49:03.892031+02:00"
     dependencies:
     - name: common
       repository: https://charts.bitnami.com/bitnami
@@ -123,7 +138,7 @@ entries:
     version: 2.0.38-alpha.8
   - apiVersion: v2
     appVersion: 0.0.1
-    created: "2025-10-09T09:39:39.933654+02:00"
+    created: "2025-10-09T09:49:03.740406+02:00"
     dependencies:
     - name: common
       repository: https://charts.bitnami.com/bitnami
@@ -138,7 +153,7 @@ entries:
     version: 2.0.38-alpha.7
   - apiVersion: v2
     appVersion: 0.0.1
-    created: "2025-10-09T09:39:39.764182+02:00"
+    created: "2025-10-09T09:49:03.575343+02:00"
     dependencies:
     - name: common
       repository: https://charts.bitnami.com/bitnami
@@ -153,7 +168,7 @@ entries:
     version: 2.0.38-alpha.6
   - apiVersion: v2
     appVersion: 0.0.1
-    created: "2025-10-09T09:39:39.604495+02:00"
+    created: "2025-10-09T09:49:03.409238+02:00"
     dependencies:
     - name: common
       repository: https://charts.bitnami.com/bitnami
@@ -168,7 +183,7 @@ entries:
     version: 2.0.38-alpha.5
   - apiVersion: v2
     appVersion: 0.0.1
-    created: "2025-10-09T09:39:39.427152+02:00"
+    created: "2025-10-09T09:49:03.242894+02:00"
     dependencies:
     - name: common
       repository: https://charts.bitnami.com/bitnami
@@ -703,4 +718,4 @@ entries:
     urls:
     - https://github.com/openstad/openstad-headless/releases/download/openstad-headless-0.0.1/openstad-headless-0.0.1.tgz
     version: 0.0.1
-generated: "2025-10-09T09:39:40.274951+02:00"
+generated: "2025-10-09T09:49:04.065662+02:00"
