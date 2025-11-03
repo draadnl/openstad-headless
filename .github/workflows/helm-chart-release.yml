@@ -34,6 +34,35 @@ jobs:
             helm lint $dir -f $dir/values.yaml --strict || exit 1
           done
 
+  version-check:
+    name: Version check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Step to read version from Chart.yaml in openstad-headless
+      - name: Read openstad-headless Chart version
+        id: read-headless-version
+        run: |
+          HEADLESS_VERSION=$(grep '^version:' charts/openstad-headless/Chart.yaml | awk '{print $2}')
+          echo "HEADLESS_VERSION=$HEADLESS_VERSION" >> $GITHUB_ENV
+
+        # Get all releases from openstad-headless repository
+      - name: Get releases and check if current version exists
+        id: get-releases
+        run: |
+          RELEASES=$(curl -s "https://api.github.com/repos/openstad/openstad-headless/releases" | jq -r '.[].tag_name')
+          echo "RELEASES=$RELEASES" >> $GITHUB_ENV
+          if echo "$RELEASES" | grep -q "^v${{ env.HEADLESS_VERSION }}$"; then
+              echo "Error: version ${{ env.HEADLESS_VERSION }} already exists in openstad-headless releases."
+              exit 1
+          fi
+          echo "Version ${{ env.HEADLESS_VERSION }} does not exist in releases."
+
   release:
     needs: lint
     if: "github.actor == 'github-actions[bot]' && contains(github.event.head_commit.message, 'ci: prod release')"
