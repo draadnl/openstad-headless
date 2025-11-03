@@ -2,11 +2,15 @@ name: Release Helm Charts
 
 on:
   push:
+    branches:
+      - 'main'
     paths:
-      - 'charts/**'
+      - 'charts/Chart.yaml'
+      - 'charts/values.yaml'
 
 jobs:
   lint:
+    if: "github.actor == 'github-actions[bot]' && contains(github.event.head_commit.message, 'ci: prod release')"
     permissions:
       contents: read
       pull-requests: read
@@ -32,7 +36,7 @@ jobs:
 
   release:
     needs: lint
-    if: github.ref == 'refs/heads/main'
+    if: "github.actor == 'github-actions[bot]' && contains(github.event.head_commit.message, 'ci: prod release')"
     # depending on default permission settings for your org (contents being read-only or read-write for workloads), you will have to add permissions
     # see: https://docs.github.com/en/actions/security-guides/automatic-token-authentication#modifying-the-permissions-for-the-github_token
     permissions:

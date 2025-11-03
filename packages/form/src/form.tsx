@@ -16,6 +16,7 @@ import ImageChoiceField from "@openstad-headless/ui/src/form-elements/image-choi
 import InfoField from "@openstad-headless/ui/src/form-elements/info";
 import NumberInput from '@openstad-headless/ui/src/form-elements/number';
 import MatrixField from "@openstad-headless/ui/src/form-elements/matrix";
+import SortField from "@openstad-headless/ui/src/form-elements/sort";
 import { FormFieldErrorMessage, Button } from "@utrecht/component-library-react";
 import './form.css'
 
@@ -38,6 +39,9 @@ function Form({
     setCurrentPage,
     prevPage,
     prevPageText,
+    pageFieldStartPositions,
+    pageFieldEndPositions,
+    totalPages,
     ...props
 }: FormProps) {
     const initialFormValues: { [key: string]: FormValue } = {};
@@ -72,14 +76,29 @@ function Form({
     const [routingHiddenFields, setRoutingHiddenFields] = useState<Array<string>>(initialHiddenFields);
     const [lastUpdatedKey, setLastUpdatedKey] = useState<string>('');
 
+    let fieldsToRender = fields;
+    if (typeof currentPage === 'number' && typeof pageFieldStartPositions !== 'undefined' && typeof pageFieldEndPositions !== 'undefined') {
+        const start = pageFieldStartPositions[currentPage];
+        const end = pageFieldEndPositions[currentPage];
+
+        fieldsToRender = fields.slice(start, end);
+    }
+
     const handleFormSubmit = (event: React.FormEvent) => {
+        let pageHandler = undefined;
+        if (typeof currentPage === 'number' && typeof totalPages === 'number' && currentPage < totalPages - 1 && setCurrentPage) {
+            allowResetAfterSubmit = false;
+            pageHandler = () => setCurrentPage(currentPage + 1);
+        }
+
         event.preventDefault();
         const firstErrorKey = handleSubmit(
-            fields as unknown as Array<CombinedFieldPropsWithType>,
+            fieldsToRender as unknown as Array<CombinedFieldPropsWithType>,
             formValues,
             setFormErrors,
             routingHiddenFields,
-            submitHandler
+            submitHandler,
+            pageHandler,
         );
 
         if (firstErrorKey && formRef.current) {
@@ -155,6 +174,7 @@ function Form({
         number: NumberInput as React.ComponentType<ComponentFieldProps>,
         matrix: MatrixField as React.ComponentType<ComponentFieldProps>,
         none: InfoField as React.ComponentType<ComponentFieldProps>,
+        sort: SortField as React.ComponentType<ComponentFieldProps>,
     };
 
     const renderField = (field: ComponentFieldProps, index: number, randomId: string, fieldInvalid: boolean) => {
@@ -185,7 +205,7 @@ function Form({
 
                 <form className="form-container" noValidate onSubmit={handleFormSubmit} ref={formRef}>
                     {/* eslint-disable-next-line @typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-unsafe-call */}
-                    {fields.map((field: ComponentFieldProps, index: number) => {
+                    {fieldsToRender.map((field: ComponentFieldProps, index: number) => {
                         const randomId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
                         const fieldInvalid = Boolean(field.fieldKey && typeof (formErrors[field.fieldKey]) !== 'undefined');
 
