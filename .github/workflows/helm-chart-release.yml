@@ -55,13 +55,13 @@ jobs:
       - name: Get releases and check if current version exists
         id: get-releases
         run: |
-          RELEASES=$(curl -s "https://api.github.com/repos/openstad/openstad-headless/releases" | jq -r '.[].tag_name')
+          RELEASES=$(curl -s "https://api.github.com/repos/${{ github.repository_owner }}/${{ github.repository }}/releases" | jq -r '.[].tag_name')
           echo "RELEASES=$RELEASES" >> $GITHUB_ENV
           if echo "$RELEASES" | grep -q "^v${{ env.HEADLESS_VERSION }}$"; then
-              echo "Error: version ${{ env.HEADLESS_VERSION }} already exists in openstad-headless releases."
+              echo "Error: version ${{ env.HEADLESS_VERSION }} already exists in ${{ github.repository_owner }}/${{ github.repository }} releases."
               exit 1
           fi
-          echo "Version ${{ env.HEADLESS_VERSION }} does not exist in releases."
+          echo "Version ${{ env.HEADLESS_VERSION }} does not exist in ${{ github.repository_owner }}/${{ github.repository }} releases."
 
   release:
     needs: lint
