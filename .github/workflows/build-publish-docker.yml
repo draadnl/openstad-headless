@@ -354,8 +354,8 @@ jobs:
           git add charts/openstad-headless/values.yaml && \
           git commit -m "ci: prod release ${{ needs.build-and-push-docker-image.outputs.image_tag }}" && \
           git push pat-origin main && \
-          git fetch pat-origin main && \
-          git checkout -B main pat-origin/main
+          git fetch origin main && \
+          git checkout -B main origin/main
 
       - name: "[PROD] Install Helm"
         if: github.ref == 'refs/heads/main'
