@@ -1,15 +1,15 @@
 admin:
   deploymentContainer:
-    image: ghcr.io/draadnl/admin-server:develop-8379de5
+    image: ghcr.io/draadnl/admin-server:develop-64a59e2
 api:
   deploymentContainer:
-    image: ghcr.io/draadnl/api-server:develop-8379de5
+    image: ghcr.io/draadnl/api-server:develop-64a59e2
 auth:
   deploymentContainer:
-    image: ghcr.io/draadnl/auth-server:develop-8379de5
+    image: ghcr.io/draadnl/auth-server:develop-64a59e2
 image:
   deploymentContainer:
-    image: ghcr.io/draadnl/image-server:develop-8379de5
+    image: ghcr.io/draadnl/image-server:develop-64a59e2
 cms:
   deploymentContainer:
-    image: ghcr.io/draadnl/cms-server:develop-8379de5
+    image: ghcr.io/draadnl/cms-server:develop-64a59e2
