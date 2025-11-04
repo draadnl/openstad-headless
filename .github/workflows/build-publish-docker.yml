@@ -339,7 +339,7 @@ jobs:
         run: |
           git config --global user.email github@ci.push && \
           git config --global user.name "Github action" && \
-          git remote set-url origin https://${{ secrets.GH_COMMIT_PAT }}@github.com/${{ github.repository }}.git && \
+          git remote add pat-origin https://${{ secrets.GH_COMMIT_PAT }}@github.com/${{ github.repository }}.git && \
           /snap/bin/yq -i '.admin.deploymentContainer.image = "ghcr.io/${{ github.repository_owner }}/admin-server:${{ needs.build-and-push-docker-image.outputs.image_tag }}"' ./operations/deployments/openstad-headless/environments/prod/images.yml && \
           /snap/bin/yq -i '.admin.deploymentContainer.image = "ghcr.io/${{ github.repository_owner }}/admin-server:${{ needs.build-and-push-docker-image.outputs.image_tag }}"' ./charts/openstad-headless/values.yaml && \
           /snap/bin/yq -i '.api.deploymentContainer.image = "ghcr.io/${{ github.repository_owner }}/api-server:${{ needs.build-and-push-docker-image.outputs.image_tag }}"' ./operations/deployments/openstad-headless/environments/prod/images.yml && \
@@ -353,7 +353,7 @@ jobs:
           git add operations/deployments/openstad-headless/environments/prod/images.yml && \
           git add charts/openstad-headless/values.yaml && \
           git commit -m "ci: prod release ${{ needs.build-and-push-docker-image.outputs.image_tag }}" && \
-          git push origin main
+          git push pat-origin main
 
       - name: "[PROD] Install Helm"
         if: github.ref == 'refs/heads/main'
