@@ -220,18 +220,30 @@ jobs:
         name: Set correct build target
         run: echo "BUILD_TARGET=${{ matrix.build-target}}" >> $GITHUB_ENV
 
+      - name: Determine image tags
+        id: set_tags
+        run: |
+          if [[ "${GITHUB_REF}" == "refs/heads/main" || ( "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && "${{ github.event.inputs.branch }}" == "main" ) ]]; then
+            echo "tags<<EOF" >> $GITHUB_OUTPUT
+            echo "type=raw,value=v${{ needs.get-openstad-version.outputs.openstad_version }}" >> $GITHUB_OUTPUT
+            echo "type=ref,event=branch,suffix=-{{sha}}" >> $GITHUB_OUTPUT
+            echo "type=ref,event=tag" >> $GITHUB_OUTPUT
+            echo "type=raw,value=latest,enable={{is_default_branch}}" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "tags<<EOF" >> $GITHUB_OUTPUT
+            echo "type=ref,event=branch,suffix=-{{sha}}" >> $GITHUB_OUTPUT
+            echo "type=ref,event=tag" >> $GITHUB_OUTPUT
+            echo "type=raw,value=latest,enable={{is_default_branch}}" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGE }}
-          tags: |
-            # branch event
-            type=ref,event=branch,suffix=-{{sha}}
-            # tag event
-            type=ref,event=tag
-            # latest tag
-            type=raw,value=latest,enable={{is_default_branch}}
+          tags: ${{ steps.set_tags.outputs.tags }}
 
       - name: Set up Docker Buildx
         id: buildx
