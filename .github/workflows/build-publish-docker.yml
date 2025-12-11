@@ -379,7 +379,7 @@ jobs:
     name: Set images in yaml and commit
     if: always() && ((github.event_name == 'workflow_dispatch' && (github.event.inputs.branch == 'main' || github.event.inputs.branch == 'develop')) || (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')) && (needs.e2e-test.result == 'success' || needs.e2e-test.result == 'skipped') && (needs.build-and-push-docker-image.result == 'success')
     runs-on: ubuntu-latest
-    needs: [e2e-test, build-and-push-docker-image, build-and-push-docker-image]
+    needs: [e2e-test, build-and-push-docker-image, build-and-push-docker-image, get-openstad-version]
     permissions:
       contents: write
       packages: write
