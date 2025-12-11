@@ -178,17 +178,17 @@ jobs:
           key: docker-base-${{ github.sha }}
           restore-keys: |
             docker-base-
-
-      - name: Build base stage
-        run: |
-          docker buildx build \
-            --target=builder \
-            --cache-to=type=local,dest=/tmp/.buildx-cache,mode=max \
-            --cache-from=type=local,src=/tmp/.buildx-cache \
-            --load \
-            --build-arg OPENSTAD_VERSION=${{ needs.get-openstad-version.outputs.openstad_version }} \
-            -t builder-stage:latest \
-            .
+#
+#      - name: Build base stage
+#        run: |
+#          docker buildx build \
+#            --target=builder \
+#            --cache-to=type=local,dest=/tmp/.buildx-cache,mode=max \
+#            --cache-from=type=local,src=/tmp/.buildx-cache \
+#            --load \
+#            --build-arg OPENSTAD_VERSION=${{ needs.get-openstad-version.outputs.openstad_version }} \
+#            -t builder-stage:latest \
+#            .
   # define job to build and publish docker image
   build-and-push-docker-image:
     needs: [get-openstad-version, build-builder-stage, version-check]
@@ -256,28 +256,28 @@ jobs:
           images: ${{ env.IMAGE }}
           tags: ${{ steps.set_tags.outputs.tags }}
 
-      - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build image and push to GitHub Container Registry
-        id: docker_build
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: 'ghcr.io/${{ steps.meta.outputs.tags }}'
-          build-args: |
-            APP=${{ matrix.app }}
-            OPENSTAD_VERSION=${{ needs.get-openstad-version.outputs.openstad_version }}
-          cache-from: type=local,src=/tmp/.buildx-cache
+#      - name: Set up Docker Buildx
+#        id: buildx
+#        uses: docker/setup-buildx-action@v3
+#
+#      - name: Login to GitHub Container Registry
+#        uses: docker/login-action@v3
+#        with:
+#          registry: ghcr.io
+#          username: ${{ github.actor }}
+#          password: ${{ secrets.GITHUB_TOKEN }}
+#
+#      - name: Build image and push to GitHub Container Registry
+#        id: docker_build
+#        uses: docker/build-push-action@v5
+#        with:
+#          context: .
+#          push: true
+#          tags: 'ghcr.io/${{ steps.meta.outputs.tags }}'
+#          build-args: |
+#            APP=${{ matrix.app }}
+#            OPENSTAD_VERSION=${{ needs.get-openstad-version.outputs.openstad_version }}
+#          cache-from: type=local,src=/tmp/.buildx-cache
 
       - name: Add image output
         id: image_output
@@ -439,6 +439,8 @@ jobs:
 
       - name: "[PROD] Release Helm Charts"
         if: (github.event_name == 'workflow_dispatch' && github.event.inputs.branch == 'main') || (github.ref == 'refs/heads/main')
+        env:
+          HELM_EXPERIMENTAL_OCI: 1
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io \
             --username "${{ github.repository_owner }}" \
