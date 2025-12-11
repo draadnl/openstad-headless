@@ -385,9 +385,7 @@ jobs:
     if: always() && ((github.event_name == 'workflow_dispatch' && (github.event.inputs.branch == 'main' || github.event.inputs.branch == 'develop')) || (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')) && (needs.e2e-test.result == 'success' || needs.e2e-test.result == 'skipped') && (needs.build-and-push-docker-image.result == 'success')
     runs-on: ubuntu-latest
     needs: [e2e-test, build-and-push-docker-image, build-and-push-docker-image, get-openstad-version]
-    permissions:
-      contents: write
-      packages: write
+
 
     defaults:
       run:
@@ -451,5 +449,5 @@ jobs:
             --username "${{ github.repository_owner }}" \
             --password-stdin && \
           helm package charts/openstad-headless && \
-          helm push openstad-headless-${{ needs.get-openstad-version.outputs.openstad_version }}.tgz oci://ghcr.io/${{ github.repository_owner }} && \
+          helm push openstad-headless-${{ needs.get-openstad-version.outputs.openstad_version }}.tgz oci://ghcr.io/${{ github.repository }} && \
           gh release create "v${{ needs.get-openstad-version.outputs.openstad_version }}" openstad-headless-${{ needs.get-openstad-version.outputs.openstad_version }}.tgz --repo ${{ github.repository }} --title "v${{ needs.get-openstad-version.outputs.openstad_version }}" --notes "Release Openstad Headless version v${{ needs.get-openstad-version.outputs.openstad_version }}." --generate-notes
