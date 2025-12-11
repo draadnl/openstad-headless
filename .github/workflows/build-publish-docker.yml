@@ -419,7 +419,7 @@ jobs:
         if: (github.event_name == 'workflow_dispatch' && github.event.inputs.branch == 'main') || (github.ref == 'refs/heads/main')
         uses: azure/setup-helm@v3
         with:
-          version: v3.5.4
+          version: v3.19.2
 
       - name: "[PROD] Helm Lint Charts"
         if: (github.event_name == 'workflow_dispatch' && github.event.inputs.branch == 'main') || (github.ref == 'refs/heads/main')
