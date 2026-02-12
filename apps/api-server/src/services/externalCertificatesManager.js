@@ -5,6 +5,15 @@
 const externalCertificates = require('./externalCertificates');
 
 /**
+ * Extracts HTTP status code from K8s client errors.
+ * @kubernetes/client-node v1.x throws ApiException with .code,
+ * older versions throw HttpError with .statusCode.
+ */
+function getErrorStatusCode(error) {
+  return error.code ?? error.statusCode;
+}
+
+/**
  * Simple slugify implementation without external dependencies.
  * Converts string to lowercase, replaces non-alphanumeric chars with dashes,
  * collapses multiple dashes, and trims leading/trailing dashes.
@@ -142,7 +151,8 @@ async function ensureExternalSecret(secretName, namespace) {
       return { created: true, secretName };
 
     } catch (error) {
-      if (error.statusCode === 409) {
+      const status = getErrorStatusCode(error);
+      if (status === 409) {
         // Resource already exists, try to update it
         try {
           await customObjects.patchNamespacedCustomObject({
@@ -164,7 +174,7 @@ async function ensureExternalSecret(secretName, namespace) {
             throw patchError;
           }
         }
-      } else if (error.statusCode === 404 && version === 'v1') {
+      } else if (status === 404 && version === 'v1') {
         // v1 not found, try v1beta1
         continue;
       } else {
@@ -221,7 +231,7 @@ async function checkSecretReady(secretName, namespace) {
       break; // Successfully read ExternalSecret, stop trying versions
 
     } catch (err) {
-      if (err.statusCode === 404) {
+      if (getErrorStatusCode(err) === 404) {
         if (version === 'v1beta1') {
           // ExternalSecret not found at all
           return {
@@ -252,7 +262,7 @@ async function checkSecretReady(secretName, namespace) {
     }
 
   } catch (err) {
-    if (err.statusCode !== 404) {
+    if (getErrorStatusCode(err) !== 404) {
       // Unexpected error reading Secret
       console.error(`[external-certificates] Error reading Secret ${secretName}:`, err.message);
     }
