@@ -20,3 +20,25 @@ Currently the following elements have been documented:
 - [Authentication and authorization](apps/api-server/doc/auth.md)
 - [Tags: thema's, areas and more](apps/api-server/doc/tags.and.statuses.md)
 - [Pagination and search](apps/api-server/doc/pagination-and-search.md)
+
+### Development
+
+#### Code formatting
+
+This project uses [Prettier](https://prettier.io/) for code formatting.
+A pre-commit hook automatically formats staged files on commit.
+
+**Setup after cloning:**
+
+```
+npm install
+```
+
+This sets up the Git hooks via Husky's `prepare` script.
+
+**Manual formatting:**
+
+```
+npm run format          # format all files
+npm run format:check    # check without modifying (used in CI)
+```
