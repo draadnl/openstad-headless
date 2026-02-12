@@ -32,5 +32,8 @@ export const keyMap: Record<string, string> = {
 
 // mapping from humanReadable to backendKey
 export const reverseKeyMap: Record<string, string> = Object.fromEntries(
-  Object.entries(keyMap).map(([backend, humanReadable]) => [humanReadable, backend])
+  Object.entries(keyMap).map(([backend, humanReadable]) => [
+    humanReadable,
+    backend,
+  ])
 );

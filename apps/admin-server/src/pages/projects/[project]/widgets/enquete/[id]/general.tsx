@@ -1,7 +1,8 @@
 import { Button } from '@/components/ui/button';
 import {
   Form,
-  FormControl, FormDescription,
+  FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -13,8 +14,8 @@ import { Spacer } from '@/components/ui/spacer';
 import { Textarea } from '@/components/ui/textarea';
 import { Heading } from '@/components/ui/typography';
 import { useFieldDebounce } from '@/hooks/useFieldDebounce';
-import { EditFieldProps } from '@/lib/form-widget-helpers/EditFieldProps';
 import { YesNoSelect } from '@/lib/form-widget-helpers';
+import { EditFieldProps } from '@/lib/form-widget-helpers/EditFieldProps';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { EnqueteWidgetProps } from '@openstad-headless/enquete/src/enquete';
 import { useForm } from 'react-hook-form';
@@ -24,10 +25,22 @@ const formSchema = z.object({
   title: z.string(),
   description: z.string(),
   afterSubmitUrl: z.string().optional(),
-  minCharactersWarning: z.string().optional().default("Nog minimaal {minCharacters} tekens"),
-  maxCharactersWarning: z.string().optional().default("Je hebt nog {maxCharacters} tekens over"),
-  minCharactersError: z.string().optional().default("Tekst moet minimaal {minCharacters} karakters bevatten"),
-  maxCharactersError: z.string().optional().default("Tekst moet maximaal {maxCharacters} karakters bevatten"),
+  minCharactersWarning: z
+    .string()
+    .optional()
+    .default('Nog minimaal {minCharacters} tekens'),
+  maxCharactersWarning: z
+    .string()
+    .optional()
+    .default('Je hebt nog {maxCharacters} tekens over'),
+  minCharactersError: z
+    .string()
+    .optional()
+    .default('Tekst moet minimaal {minCharacters} karakters bevatten'),
+  maxCharactersError: z
+    .string()
+    .optional()
+    .default('Tekst moet maximaal {maxCharacters} karakters bevatten'),
   enableDraftPersistence: z.boolean().optional(),
   draftRetentionHours: z.coerce.number().optional(),
 });
@@ -46,10 +59,16 @@ export default function WidgetEnqueteGeneral(
       title: props?.title || '',
       description: props?.description || '',
       afterSubmitUrl: props.afterSubmitUrl || '',
-      minCharactersWarning: props.minCharactersWarning || 'Nog minimaal {minCharacters} tekens',
-      maxCharactersWarning: props.maxCharactersWarning || 'Je hebt nog {maxCharacters} tekens over',
-      minCharactersError: props.minCharactersError || 'Tekst moet minimaal {minCharacters} karakters bevatten',
-      maxCharactersError: props.maxCharactersError || 'Tekst moet maximaal {maxCharacters} karakters bevatten',
+      minCharactersWarning:
+        props.minCharactersWarning || 'Nog minimaal {minCharacters} tekens',
+      maxCharactersWarning:
+        props.maxCharactersWarning || 'Je hebt nog {maxCharacters} tekens over',
+      minCharactersError:
+        props.minCharactersError ||
+        'Tekst moet minimaal {minCharacters} karakters bevatten',
+      maxCharactersError:
+        props.maxCharactersError ||
+        'Tekst moet maximaal {maxCharacters} karakters bevatten',
       enableDraftPersistence: props.enableDraftPersistence ?? false,
       draftRetentionHours: props.draftRetentionHours ?? 24,
     },
@@ -88,11 +107,13 @@ export default function WidgetEnqueteGeneral(
             name="afterSubmitUrl"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Url voor redirecten na opslaan (optioneel)</FormLabel>
+                <FormLabel>
+                  Url voor redirecten na opslaan (optioneel)
+                </FormLabel>
                 <FormControl>
                   <Input
                     {...field}
-                    placeholder='bijvoorbeeld /enquetes/[id] of laat leeg voor geen redirect'
+                    placeholder="bijvoorbeeld /enquetes/[id] of laat leeg voor geen redirect"
                     onChange={(e) => {
                       field.onChange(e);
                       onFieldChange(field.name, e.target.value);
@@ -132,7 +153,8 @@ export default function WidgetEnqueteGeneral(
               <FormItem>
                 <FormLabel>Concept automatisch opslaan</FormLabel>
                 <FormDescription>
-                  Sla ingevulde antwoorden automatisch op in de browser, zodat gebruikers later kunnen verdergaan.
+                  Sla ingevulde antwoorden automatisch op in de browser, zodat
+                  gebruikers later kunnen verdergaan.
                 </FormDescription>
                 {YesNoSelect(field, props)}
                 <FormMessage />
@@ -178,9 +200,7 @@ export default function WidgetEnqueteGeneral(
                 <FormDescription>
                   {`Dit is de tekst die getoond wordt als het aantal karakters onder de minimum waarde ligt. Gebruik {minCharacters} zodat het aantal karakters automatisch wordt ingevuld.`}
                 </FormDescription>
-                <Input
-                  {...field}
-                />
+                <Input {...field} />
                 <FormMessage />
               </FormItem>
             )}
@@ -197,9 +217,7 @@ export default function WidgetEnqueteGeneral(
                 <FormDescription>
                   {`Dit is de tekst die getoond wordt als het aantal karakters boven de maximum waarde ligt. Gebruik {maxCharacters} zodat het aantal karakters automatisch wordt ingevuld.`}
                 </FormDescription>
-                <Input
-                  {...field}
-                />
+                <Input {...field} />
                 <FormMessage />
               </FormItem>
             )}
@@ -216,9 +234,7 @@ export default function WidgetEnqueteGeneral(
                 <FormDescription>
                   {`Dit is de tekst van de foutmelding die getoond wordt als het aantal karakters onder de minimum waarde ligt na het versturen van het formulier. Gebruik {minCharacters} zodat het aantal karakters automatisch wordt ingevuld.`}
                 </FormDescription>
-                <Input
-                  {...field}
-                />
+                <Input {...field} />
                 <FormMessage />
               </FormItem>
             )}
@@ -235,9 +251,7 @@ export default function WidgetEnqueteGeneral(
                 <FormDescription>
                   {`Dit is de tekst van de foutmelding die getoond wordt als het aantal karakters boven de maximum waarde ligt na het versturen van het formulier. Gebruik {maxCharacters} zodat het aantal karakters automatisch wordt ingevuld.`}
                 </FormDescription>
-                <Input
-                  {...field}
-                />
+                <Input {...field} />
                 <FormMessage />
               </FormItem>
             )}

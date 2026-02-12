@@ -1,8 +1,13 @@
-import React, { FC } from "react";
-import { AccordionProvider, Paragraph, Strong } from "@utrecht/component-library-react";
-import { Spacer } from "../../spacer";
-import { FormValue } from "@openstad-headless/form/src/form";
-import { InfoImage } from "../../infoImage";
+import { FormValue } from '@openstad-headless/form/src/form';
+import {
+  AccordionProvider,
+  Paragraph,
+  Strong,
+} from '@utrecht/component-library-react';
+import React, { FC } from 'react';
+
+import { InfoImage } from '../../infoImage';
+import { Spacer } from '../../spacer';
 
 export type InfoFieldProps = {
   overrideDefaultValue?: FormValue;
@@ -33,7 +38,7 @@ export type InfoFieldProps = {
   }>;
   createImageSlider?: boolean;
   imageClickable?: boolean;
-}
+};
 
 const InfoField: FC<InfoFieldProps> = ({
   title = '',
@@ -58,10 +63,17 @@ const InfoField: FC<InfoFieldProps> = ({
 
   return (
     <div className="info-field-container">
-      {title && <Paragraph className="info-field-title"><Strong dangerouslySetInnerHTML={{ __html: title }}></Strong></Paragraph>}
-      {description &&
-        <Paragraph className="info-field-description" dangerouslySetInnerHTML={{ __html: description }} />
-      }
+      {title && (
+        <Paragraph className="info-field-title">
+          <Strong dangerouslySetInnerHTML={{ __html: title }}></Strong>
+        </Paragraph>
+      )}
+      {description && (
+        <Paragraph
+          className="info-field-description"
+          dangerouslySetInnerHTML={{ __html: description }}
+        />
+      )}
 
       {showMoreInfo && (
         <>
@@ -72,7 +84,7 @@ const InfoField: FC<InfoFieldProps> = ({
                 body: <HtmlContent html={moreInfoContent} />,
                 expanded: undefined,
                 label: moreInfoButton,
-              }
+              },
             ]}
           />
           <Spacer size={1.5} />
@@ -86,7 +98,7 @@ const InfoField: FC<InfoFieldProps> = ({
         images: images,
         createImageSlider: createImageSlider,
         addSpacer: !!infoImage,
-        imageClickable: imageClickable
+        imageClickable: imageClickable,
       })}
     </div>
   );
