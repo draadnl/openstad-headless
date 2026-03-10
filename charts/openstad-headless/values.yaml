@@ -317,6 +317,8 @@ api:
   # How often the K8s CronJob runs (in minutes). Each run picks up all
   # application-level cron jobs that were scheduled within this window.
   cronWindowMinutes: 15
+  # Resources for the CronJob (falls back to api.resources if not set):
+  cronResources:
   # Resources:
   resources:
     # Max resources

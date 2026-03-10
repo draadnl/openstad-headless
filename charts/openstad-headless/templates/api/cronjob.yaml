@@ -40,7 +40,7 @@ spec:
                 - mountPath: /tmp
                   name: tmp-dir
               resources:
-{{ toYaml .Values.api.resources | indent 16 }}
+{{ toYaml (default .Values.api.resources .Values.api.cronResources) | indent 16 }}
               env:
               - name: CRON_WINDOW_MINUTES
                 value: "{{ .Values.api.cronWindowMinutes }}"
