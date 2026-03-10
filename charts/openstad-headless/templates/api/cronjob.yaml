@@ -35,6 +35,7 @@ spec:
               image: {{ .Values.api.deploymentContainer.image }}
               imagePullPolicy: IfNotPresent
               command: ["node", "run-crons.js"]
+              workingDir: /opt/openstad-headless/apps/api-server
               volumeMounts:
                 - mountPath: /tmp
                   name: tmp-dir
