@@ -123,6 +123,13 @@ persistence:
 admin:
   # Configure how many replicas exists of this service
   replicas: 1
+  # Autoscaling (HPA) settings
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
   # Configure how the service is named and labeled
   name: 'admin'
   label: openstad-admin-service
@@ -187,6 +194,14 @@ admin:
       initialDelaySeconds: 30
       periodSeconds: 60
 auth:
+  replicas: 1
+  # Autoscaling (HPA) settings
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
   label: openstad-auth-service
   name: auth
   # Subdomain for the service:
@@ -243,6 +258,14 @@ auth:
   cookie:
     secureOff:
 api:
+  replicas: 1
+  # Autoscaling (HPA) settings
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
   name: api
   label: openstad-api-service
   service:
@@ -311,14 +334,18 @@ api:
   # Inject extra environment variables
   extraEnvVars: []
   disableProjectIssueWarnings: "false"
-  # When running multiple replicas, offload cron jobs to a Kubernetes CronJob
-  # to prevent duplicate execution across pods.
-  useKubernetesCronjobs: false
-  # How often the K8s CronJob runs (in minutes). Each run picks up all
-  # application-level cron jobs that were scheduled within this window.
-  cronWindowMinutes: 15
-  # Resources for the CronJob (falls back to api.resources if not set):
-  cronResources:
+  # Kubernetes CronJob settings
+  cron:
+    # When running multiple replicas, offload cron jobs to a Kubernetes CronJob
+    # to prevent duplicate execution across pods.
+    useKubernetesCronjobs: false
+    # How often the K8s CronJob runs (in minutes). Each run picks up all
+    # application-level cron jobs that were scheduled within this window.
+    windowMinutes: 15
+    # Batch size for score recalculation cron job
+    recalculateScoresBatchSize: 100
+    # Resources for the CronJob (falls back to api.resources if not set):
+    resources:
   # Resources:
   resources:
     # Max resources
@@ -338,6 +365,13 @@ api:
 image:
   # Configure how many replicas exists of this service
   replicas: 1
+  # Autoscaling (HPA) settings
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
   # Configure how the service is named and labeled
   name: 'image'
   label: openstad-image-service
@@ -412,6 +446,14 @@ image:
       mountPath: /opt/openstad-headless/apps/image-server/images
       documentMountPath: /opt/openstad-headless/apps/image-server/documents
 cms:
+  replicas: 1
+  # Autoscaling (HPA) settings
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
   name: cms
   label: openstad-cms-service
   service:

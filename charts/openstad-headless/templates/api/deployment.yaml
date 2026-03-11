@@ -8,7 +8,9 @@ metadata:
     {{- include "openstad.labels" . | nindent 4 }}
     app.kubernetes.io/component: {{ template "openstad.api.fullname" . }}-deployment
 spec:
+  {{- if not .Values.api.autoscaling.enabled }}
   replicas: {{ .Values.api.replicas | default 1 }}
+  {{- end }}
   revisionHistoryLimit: 10
   selector:
     matchLabels:
@@ -157,7 +159,7 @@ spec:
             value: "{{ .Values.api.disableProjectIssueWarnings }}"
 
           - name: USE_KUBERNETES_CRONJOBS
-            value: "{{ .Values.api.useKubernetesCronjobs }}"
+            value: "{{ .Values.api.cron.useKubernetesCronjobs }}"
 
           - name: AUTH_JWTSECRET
             valueFrom:

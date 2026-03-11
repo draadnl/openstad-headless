@@ -1,4 +1,4 @@
-{{- if eq (toString .Values.api.useKubernetesCronjobs) "true" }}
+{{- if eq (toString .Values.api.cron.useKubernetesCronjobs) "true" }}
 ---
 apiVersion: batch/v1
 kind: CronJob
@@ -9,13 +9,13 @@ metadata:
     {{- include "openstad.labels" . | nindent 4 }}
     app.kubernetes.io/component: {{ template "openstad.api.fullname" . }}-cron
 spec:
-  schedule: "*/{{ .Values.api.cronWindowMinutes }} * * * *"
+  schedule: "*/{{ .Values.api.cron.windowMinutes }} * * * *"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
   jobTemplate:
     spec:
-      activeDeadlineSeconds: {{ mul (int .Values.api.cronWindowMinutes) 60 }}
+      activeDeadlineSeconds: {{ mul (int .Values.api.cron.windowMinutes) 60 }}
       template:
         metadata:
           labels:
@@ -40,10 +40,13 @@ spec:
                 - mountPath: /tmp
                   name: tmp-dir
               resources:
-{{ toYaml (default .Values.api.resources .Values.api.cronResources) | indent 16 }}
+{{ toYaml (default .Values.api.resources .Values.api.cron.resources) | indent 16 }}
               env:
               - name: CRON_WINDOW_MINUTES
-                value: "{{ .Values.api.cronWindowMinutes }}"
+                value: "{{ .Values.api.cron.windowMinutes }}"
+
+              - name: RECALCULATE_SCORES_BATCH_SIZE
+                value: "{{ .Values.api.cron.recalculateScoresBatchSize }}"
 
               - name: URL
                 value: https://{{ template "openstad.api.url" . }}

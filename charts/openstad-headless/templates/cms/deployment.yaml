@@ -8,7 +8,9 @@ metadata:
     {{- include "openstad.labels" . | nindent 4 }}
     app.kubernetes.io/component: {{ template "openstad.cms.fullname" . }}-deployment
 spec:
+  {{- if not .Values.cms.autoscaling.enabled }}
   replicas: {{ .Values.cms.replicas | default 1 }}
+  {{- end }}
   selector:
     matchLabels:
       app: {{ .Values.cms.label }}

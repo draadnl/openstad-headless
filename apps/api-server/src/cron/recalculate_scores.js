@@ -1,8 +1,23 @@
-const { Sequelize, Op } = require('sequelize');
 const log = require('debug')('app:cron');
 const config = require('config');
 const { Resource, Comment } = require('../db');
 const UseLock = require('../lib/use-lock');
+
+const BATCH_SIZE =
+  parseInt(process.env.RECALCULATE_SCORES_BATCH_SIZE, 10) || 100;
+
+async function recalculateInBatches(Model) {
+  let offset = 0;
+  let batch;
+  do {
+    batch = await Model.findAll({ limit: BATCH_SIZE, offset });
+    for (const record of batch) {
+      record.auth.user = { role: 'admin' };
+      await record.calculateAndSaveScore();
+    }
+    offset += batch.length;
+  } while (batch.length === BATCH_SIZE);
+}
 
 // Recalculate the scores for all Resources / Comments based on existing votes
 // There are hooks in place to do this on vote creation/deletion, but if those hooks
@@ -15,30 +30,12 @@ module.exports = {
     name: 'recalculate-scores',
     task: async (next) => {
       try {
-        // Fetch all resources and calculate their scores based on existing votes
-        const resources = await Resource.findAll();
-        for (const resource of resources) {
-          // Workaround for validation in Resource model
-          resource.auth.user = {
-            role: 'admin',
-          };
-          await resource.calculateAndSaveScore();
-        }
-
-        // Fetch all comments and calculate their scores based on existing votes
-        const comments = await Comment.findAll();
-        for (const comment of comments) {
-          // Workaround for validation in Comment model
-          comment.auth.user = {
-            role: 'admin',
-          };
-          await comment.calculateAndSaveScore();
-        }
-
+        await recalculateInBatches(Resource);
+        await recalculateInBatches(Comment);
         return next();
       } catch (err) {
         console.log('error in recalculate-scores cron');
-        next(err); // let the locked function handle this
+        next(err);
       }
     },
   }),
