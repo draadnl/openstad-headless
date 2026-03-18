@@ -45,7 +45,7 @@
     "@openstad-headless/lib": "*",
     "@apostrophecms/anchors": "~1.1.0",
     "@apostrophecms/blog": "~1.0.6",
-    "@apostrophecms/import-export": "~3.5.2",
+    "@apostrophecms/import-export": "~3.5.3",
     "@apostrophecms/redirect": "~1.5.0",
     "@apostrophecms/seo": "~1.4.0",
     "@apostrophecms/sitemap": "~1.2.0",
