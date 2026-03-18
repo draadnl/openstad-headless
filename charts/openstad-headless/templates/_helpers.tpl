@@ -391,6 +391,71 @@ affinity:
 {{- end }}
 {{- end -}}
 
+{{/*
+    Merge global autoscaling defaults with per-service overrides.
+    Usage: {{ include "openstad.autoscaling.mergedValues" (dict "Values" .Values "serviceAutoscaling" .Values.api.autoscaling) }}
+    Returns a YAML dict with the merged autoscaling config.
+*/}}
+{{- define "openstad.autoscaling.mergedValues" -}}
+{{- $global := .Values.global.autoscaling | default dict -}}
+{{- $service := .serviceAutoscaling | default dict -}}
+{{- $merged := mustMergeOverwrite (deepCopy $global) $service -}}
+{{- toYaml $merged -}}
+{{- end -}}
+
+{{/*
+    HPA template. Pass a dict with Values, Release, fullname, and serviceAutoscaling.
+    Usage: {{ include "openstad.hpa" (dict "Values" .Values "Release" .Release "fullname" (include "openstad.api.fullname" .) "serviceAutoscaling" .Values.api.autoscaling) }}
+*/}}
+{{- define "openstad.hpa" -}}
+{{- $merged := include "openstad.autoscaling.mergedValues" . | fromYaml -}}
+{{- if $merged.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ .fullname }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ .fullname }}
+  minReplicas: {{ $merged.minReplicas | default 1 }}
+  maxReplicas: {{ $merged.maxReplicas | default 5 }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $merged.targetCPUUtilizationPercentage | default 80 }}
+    {{- if $merged.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ $merged.targetMemoryUtilizationPercentage }}
+    {{- end }}
+  {{- if $merged.behavior }}
+  behavior:
+    {{- toYaml $merged.behavior | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end -}}
+
+{{/*
+    Replicas helper. Returns the replicas field only when autoscaling is NOT enabled,
+    so the HPA can manage replicas instead.
+    Usage: {{ include "openstad.replicas" (dict "Values" .Values "serviceAutoscaling" .Values.api.autoscaling "replicas" (.Values.api.replicas | default 1)) }}
+*/}}
+{{- define "openstad.replicas" -}}
+{{- $merged := include "openstad.autoscaling.mergedValues" . | fromYaml -}}
+{{- if not $merged.enabled }}
+replicas: {{ .replicas }}
+{{- end }}
+{{- end -}}
+
 {{- define "openstad.createdIngresses.annotations" -}}
 {{- if eq (include "openstad.ingress.type" .) "traefik" -}}
 {{- $user := .Values.api.createdIngresses.annotations | default dict -}}
