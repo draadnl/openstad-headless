@@ -423,12 +423,14 @@ spec:
   minReplicas: {{ $merged.minReplicas | default 1 }}
   maxReplicas: {{ $merged.maxReplicas | default 5 }}
   metrics:
+    {{- if $merged.targetCPUUtilizationPercentage }}
     - type: Resource
       resource:
         name: cpu
         target:
           type: Utilization
-          averageUtilization: {{ $merged.targetCPUUtilizationPercentage | default 80 }}
+          averageUtilization: {{ $merged.targetCPUUtilizationPercentage }}
+    {{- end }}
     {{- if $merged.targetMemoryUtilizationPercentage }}
     - type: Resource
       resource:
