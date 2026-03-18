@@ -8,9 +8,7 @@ metadata:
     {{- include "openstad.labels" . | nindent 4 }}
     app.kubernetes.io/component: {{ template "openstad.api.fullname" . }}-deployment
 spec:
-  {{- if not .Values.api.autoscaling.enabled }}
-  replicas: {{ .Values.api.replicas | default 1 }}
-  {{- end }}
+  {{- include "openstad.replicas" (dict "Values" .Values "serviceAutoscaling" .Values.api.autoscaling "replicas" (.Values.api.replicas | default 1)) | nindent 2 }}
   revisionHistoryLimit: 10
   selector:
     matchLabels:

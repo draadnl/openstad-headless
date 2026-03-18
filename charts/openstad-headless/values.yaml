@@ -7,6 +7,27 @@ global:
   podAntiAffinity:
     enabled: false
     mode: preferred
+  # Horizontal Pod Autoscaler defaults for all services.
+  # Per-service overrides can be set under <service>.autoscaling.
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 5
+    # targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
+    behavior:
+      scaleUp:
+        stabilizationWindowSeconds: 60
+        policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 60
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        policies:
+          - type: Percent
+            value: 10
+            periodSeconds: 60
 
 # Optional Dependencies
 
@@ -123,13 +144,6 @@ persistence:
 admin:
   # Configure how many replicas exists of this service
   replicas: 1
-  # Autoscaling (HPA) settings
-  autoscaling:
-    enabled: false
-    minReplicas: 1
-    maxReplicas: 5
-    targetCPUUtilizationPercentage: 80
-    # targetMemoryUtilizationPercentage: 80
   # Configure how the service is named and labeled
   name: 'admin'
   label: openstad-admin-service
@@ -195,13 +209,6 @@ admin:
       periodSeconds: 60
 auth:
   replicas: 1
-  # Autoscaling (HPA) settings
-  autoscaling:
-    enabled: false
-    minReplicas: 1
-    maxReplicas: 5
-    targetCPUUtilizationPercentage: 80
-    # targetMemoryUtilizationPercentage: 80
   label: openstad-auth-service
   name: auth
   # Subdomain for the service:
@@ -259,13 +266,6 @@ auth:
     secureOff:
 api:
   replicas: 1
-  # Autoscaling (HPA) settings
-  autoscaling:
-    enabled: false
-    minReplicas: 1
-    maxReplicas: 5
-    targetCPUUtilizationPercentage: 80
-    # targetMemoryUtilizationPercentage: 80
   name: api
   label: openstad-api-service
   service:
@@ -365,13 +365,6 @@ api:
 image:
   # Configure how many replicas exists of this service
   replicas: 1
-  # Autoscaling (HPA) settings
-  autoscaling:
-    enabled: false
-    minReplicas: 1
-    maxReplicas: 5
-    targetCPUUtilizationPercentage: 80
-    # targetMemoryUtilizationPercentage: 80
   # Configure how the service is named and labeled
   name: 'image'
   label: openstad-image-service
@@ -447,13 +440,6 @@ image:
       documentMountPath: /opt/openstad-headless/apps/image-server/documents
 cms:
   replicas: 1
-  # Autoscaling (HPA) settings
-  autoscaling:
-    enabled: false
-    minReplicas: 1
-    maxReplicas: 5
-    targetCPUUtilizationPercentage: 80
-    # targetMemoryUtilizationPercentage: 80
   name: cms
   label: openstad-cms-service
   service:
