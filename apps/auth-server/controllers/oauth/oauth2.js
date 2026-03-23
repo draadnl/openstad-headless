@@ -241,7 +241,7 @@ exports.authorization = [
     db.Client.findOne({ where: { clientId: clientId } })
       .then((client) => {
         if (client) {
-          client.scope = scope; // eslint-disable-line no-param-reassign
+          client.scope = Array.isArray(scope) ? scope.join(' ') : scope; // eslint-disable-line no-param-reassign
         }
 
         /**
