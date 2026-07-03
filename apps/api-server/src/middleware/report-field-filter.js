@@ -76,6 +76,16 @@ function reportFieldFilter(req, res, next) {
   const originalJson = res.json.bind(res);
 
   res.json = function filteredJson(payload) {
+    // Error responses (4xx/5xx) are synthesized by this app (e.g. the
+    // reporting filter's { error: {code,message,param,hint} } shape from
+    // filters.js), never raw DB records — they carry no PII. Pass them
+    // through unfiltered instead of running them through the
+    // component/aggregate projection below, which otherwise doesn't
+    // recognise the `{error:...}` shape and fails closed to `{}`.
+    if (res.statusCode >= 400) {
+      return originalJson(payload);
+    }
+
     if (scope.componentKey === null) {
       // Aggregate / metadata endpoint — only primitive counts/dates may pass.
       // A top-level array must contain only aggregate rows (primitives or flat
