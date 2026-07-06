@@ -237,7 +237,9 @@ describe('apiTokenScopeGuard', () => {
       expect(next).not.toHaveBeenCalled();
     });
 
-    it('allows /reports/users/anonymized (#442) when at least one component is enabled', () => {
+    it('blocks /reports/users/anonymized (#442) when only an unrelated component is enabled', () => {
+      // Enabling e.g. 'votes' must NOT unlock the project-wide participant
+      // roster — that requires its own dedicated dataScope.users.enabled.
       const req = makeReq({
         apiTokenScope: 'reports',
         method: 'GET',
@@ -249,16 +251,48 @@ describe('apiTokenScopeGuard', () => {
 
       apiTokenScopeGuard(req, res, next);
 
-      expect(next).toHaveBeenCalledOnce();
-      expect(req.reportingScope).toMatchObject({ componentKey: null });
+      expect(res._status).toBe(403);
+      expect(next).not.toHaveBeenCalled();
     });
 
-    it('allows /reports/users/aggregates (#442) when at least one component is enabled', () => {
+    it('blocks /reports/users/aggregates (#442) when only an unrelated component is enabled', () => {
       const req = makeReq({
         apiTokenScope: 'reports',
         method: 'GET',
         path: '/project/1/reports/users/aggregates',
         projectDataScope: { votes: { enabled: true, personalFields: [] } },
+      });
+      const res = makeRes();
+      const next = vi.fn();
+
+      apiTokenScopeGuard(req, res, next);
+
+      expect(res._status).toBe(403);
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('allows /reports/users/anonymized when dataScope.users.enabled is true', () => {
+      const req = makeReq({
+        apiTokenScope: 'reports',
+        method: 'GET',
+        path: '/project/1/reports/users/anonymized',
+        projectDataScope: { users: { enabled: true, personalFields: [] } },
+      });
+      const res = makeRes();
+      const next = vi.fn();
+
+      apiTokenScopeGuard(req, res, next);
+
+      expect(next).toHaveBeenCalledOnce();
+      expect(req.reportingScope).toMatchObject({ componentKey: null });
+    });
+
+    it('allows /reports/users/aggregates when dataScope.users.enabled is true', () => {
+      const req = makeReq({
+        apiTokenScope: 'reports',
+        method: 'GET',
+        path: '/project/1/reports/users/aggregates',
+        projectDataScope: { users: { enabled: true, personalFields: [] } },
       });
       const res = makeRes();
       const next = vi.fn();
@@ -282,6 +316,37 @@ describe('apiTokenScopeGuard', () => {
 
       expect(res._status).toBe(403);
       expect(next).not.toHaveBeenCalled();
+    });
+
+    it('blocks /reports/users/anonymized when dataScope.users.enabled is false', () => {
+      const req = makeReq({
+        apiTokenScope: 'reports',
+        method: 'GET',
+        path: '/project/1/reports/users/anonymized',
+        projectDataScope: { users: { enabled: false, personalFields: [] } },
+      });
+      const res = makeRes();
+      const next = vi.fn();
+
+      apiTokenScopeGuard(req, res, next);
+
+      expect(res._status).toBe(403);
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('still allows /overview when any component is enabled (unaffected by the users gate)', () => {
+      const req = makeReq({
+        apiTokenScope: 'reports',
+        method: 'GET',
+        path: '/project/1/overview',
+        projectDataScope: { votes: { enabled: true, personalFields: [] } },
+      });
+      const res = makeRes();
+      const next = vi.fn();
+
+      apiTokenScopeGuard(req, res, next);
+
+      expect(next).toHaveBeenCalledOnce();
     });
   });
 
