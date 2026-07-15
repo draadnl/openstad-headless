@@ -1,5 +1,4 @@
 import { CheckboxList } from '@/components/checkbox-list';
-import { Button } from '@/components/ui/button';
 import {
   Form,
   FormControl,
@@ -13,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Heading } from '@/components/ui/typography';
 import { useFieldDebounce } from '@/hooks/useFieldDebounce';
+import { useSyncDraftForm } from '@/hooks/useWidgetDraft';
 import { YesNoSelect, undefinedToTrueOrProp } from '@/lib/form-widget-helpers';
 import { EditFieldProps } from '@/lib/form-widget-helpers/EditFieldProps';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -22,12 +22,7 @@ import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 
 type ShareOption =
-  | 'facebook'
-  | 'x'
-  | 'mail'
-  | 'whatsapp'
-  | 'linkedin'
-  | 'copylink';
+  'facebook' | 'x' | 'mail' | 'whatsapp' | 'linkedin' | 'copylink';
 const shareOptions: [ShareOption, ...ShareOption[]] = [
   'facebook',
   'x',
@@ -143,6 +138,13 @@ export default function WidgetResourceDetailDisplay(
           ? defaultShareValues
           : props?.selectedSocialShareOptions || [],
     },
+  });
+
+  // Every RHF field on this tab feeds the whole-widget draft automatically,
+  // coerced + validated against the tab schema.
+  useSyncDraftForm(form, props.onFieldChanged, {
+    schema: formSchema,
+    label: 'Weergave',
   });
 
   return (
@@ -604,10 +606,6 @@ export default function WidgetResourceDetailDisplay(
               )}
             />
           )}
-
-          <Button className="w-fit col-span-full" type="submit">
-            Opslaan
-          </Button>
         </form>
       </Form>
     </div>
