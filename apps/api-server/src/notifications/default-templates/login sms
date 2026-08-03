@@ -1,5 +1,5 @@
 <!-- template: login sms -->
-<subject>login sms</subject>
+<subject>Je inlogcode</subject>
 <body>
 Je code is {{code}}.
 Groeten, Team OpenStad.

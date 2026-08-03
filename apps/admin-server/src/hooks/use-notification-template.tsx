@@ -1,6 +1,21 @@
 import { validateProjectNumber } from '@/lib/validateProjectNumber';
 import useSWR from 'swr';
 
+export type NotificationTemplateDefault = {
+  type: string;
+  label: string;
+  subject: string;
+  body: string;
+};
+
+export function useNotificationTemplateDefaults(projectId?: string) {
+  const projectNumber: number | undefined = validateProjectNumber(projectId);
+
+  const url = `/api/openstad/notification/project/${projectNumber}/template/defaults`;
+
+  return useSWR<NotificationTemplateDefault[]>(projectNumber ? url : null);
+}
+
 export default function useNotificationTemplate(projectId?: string) {
   const projectNumber: number | undefined = validateProjectNumber(projectId);
 

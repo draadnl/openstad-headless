@@ -1,5 +1,4 @@
 <!-- template: new published resource - admin update -->
-<subject>new published resource - admin update</subject>
 <subject>Nieuwe resource op {{project.title}}</subject>
 <body>
   <mjml>
@@ -9,7 +8,7 @@
       </mj-raw>
       <mj-section>
         <mj-column width="200px">
-          <mj-image src="{{imagePath}}/logo-openstad.png">
+          <mj-image src="{{ logo or (imagePath + '/logo-openstad.png') }}">
           </mj-image>
         </mj-column>
       </mj-section>

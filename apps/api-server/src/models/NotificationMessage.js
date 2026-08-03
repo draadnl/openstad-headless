@@ -1,7 +1,30 @@
-const fs = require('fs').promises;
 const nunjucks = require('nunjucks');
 const mjml2html = require('mjml');
 const sendMessage = require('../notifications/send-engines');
+const defaultTemplatesCatalog = require('../notifications/default-templates-catalog');
+const authSettings = require('../util/auth-settings');
+
+async function resolveClientName(project, fallback) {
+  try {
+    const providers = await authSettings.providers({ project });
+    for (const provider of providers) {
+      if (provider === 'default') continue;
+      const authConfig = await authSettings.config({
+        project,
+        useAuth: provider,
+      });
+      if (!authConfig.clientId) continue;
+      const adapter = await authSettings.adapter({ authConfig });
+      if (!adapter || !adapter.service || !adapter.service.fetchClient)
+        continue;
+      const client = await adapter.service.fetchClient({ authConfig, project });
+      if (client && client.name) return client.name;
+    }
+  } catch (err) {
+    // best-effort only; auth server may be unreachable or unconfigured
+  }
+  return fallback;
+}
 
 let nunjucksEnv;
 
@@ -77,16 +100,9 @@ module.exports = (db, sequelize, DataTypes) => {
                 },
               });
               if (!template) {
-                let file = await fs.readFile(
-                  `src/notifications/default-templates/${instance.type}`
+                template = await defaultTemplatesCatalog.getDefaultTemplate(
+                  instance.type
                 );
-                file = file.toString();
-                let match = file.match(
-                  /<subject>((?:.|\r|\n)*)<\/subject>(?:.|\r|\n)*<body>((?:.|\r|\n)*)<\/body>/
-                );
-                let subject = match && match[1];
-                let body = match && match[2];
-                if (subject && body) template = { subject, body };
               }
               if (!template) throw new Error('Notification template not found');
 
@@ -95,6 +111,23 @@ module.exports = (db, sequelize, DataTypes) => {
                 'includeConfig',
                 'includeEmailConfig'
               ).findByPk(instance.projectId);
+
+              templateData.imagePath = process.env.EMAIL_ASSETS_URL || '';
+              templateData.logo =
+                (templateData.project &&
+                  templateData.project.emailConfig &&
+                  templateData.project.emailConfig.styling &&
+                  templateData.project.emailConfig.styling.logo) ||
+                '';
+              templateData.projectName =
+                (templateData.project &&
+                  (templateData.project.title || templateData.project.name)) ||
+                '';
+              templateData.clientName = await resolveClientName(
+                templateData.project,
+                templateData.projectName
+              );
+
               let keys = ['resource', 'user', 'comment', 'submission'];
               for (let key of keys) {
                 let idkey = key + 'Id';

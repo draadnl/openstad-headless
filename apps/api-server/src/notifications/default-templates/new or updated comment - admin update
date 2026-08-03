@@ -1,3 +1,5 @@
+<!-- template: new or updated comment - admin update -->
+<subject>Nieuwe reactie op {{ resource.name }}</subject>
 <body>
   <mjml>
     <mj-body>
@@ -6,7 +8,7 @@
       </mj-raw>
       <mj-section>
         <mj-column width="200px">
-          <mj-image src="{{ imagePath }}/logo-openstad.png"> </mj-image>
+          <mj-image src="{{ logo or (imagePath + '/logo-openstad.png') }}"> </mj-image>
         </mj-column>
       </mj-section>
       <mj-raw>
