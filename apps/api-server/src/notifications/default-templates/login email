@@ -1,5 +1,5 @@
 <!-- template: login email -->
-<subject>login email</subject>
+<subject>Je inloglink voor {{project.name}}</subject>
 <body>
   <mjml>
     <mj-body>
@@ -8,7 +8,7 @@
       </mj-raw>
       <mj-section>
         <mj-column>
-          <mj-image src="{{imagePath}}/logo-openstad.png" height="70px" width="99px">
+          <mj-image src="{{ logo or (imagePath + '/logo-openstad.png') }}" height="70px" width="99px">
           </mj-image>
         </mj-column>
       </mj-section>
@@ -26,7 +26,7 @@
       <mj-section>
         <mj-column width="400px">
           <mj-text font-size="20px" font-family="Helvetica Neue">Inlogmail aangevraagd</mj-text>
-          <mj-text>Beste {{user}},</mj-text>
+          <mj-text>Beste {{ name or 'bezoeker' }},</mj-text>
           <mj-text color="#525252">Voor Admin panel is een inloglink aangevraagd voor dit emailadres. Klik op de knop hieronder om automatisch in te loggen. De knop is 10 minuten geldig. </mj-text>
           <mj-button background-color="#12B886" href="{{loginurl}}">Log in</mj-button>
         </mj-column>
