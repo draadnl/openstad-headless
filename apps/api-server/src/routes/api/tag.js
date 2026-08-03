@@ -3,6 +3,11 @@ const db = require('../../db');
 const auth = require('../../middleware/sequelize-authorization-middleware');
 const pagination = require('../../middleware/pagination');
 const rateLimiter = require('@openstad-headless/lib/rateLimiter');
+const {
+  normalizeTagType,
+  isSeqnrProvided,
+  resolveSeqnr,
+} = require('./tagHelpers');
 
 let router = express.Router({ mergeParams: true });
 
@@ -69,7 +74,9 @@ router
   .post(rateLimiter(), function (req, res, next) {
     const data = {
       name: req.body.name,
-      type: req.body.type,
+      // Normalised up front so the seqnr lookup below queries the same value
+      // the model will store; the model setter re-applies this idempotently.
+      type: normalizeTagType(req.body.type),
       seqnr: req.body.seqnr,
       addToNewResources: req.body.addToNewResources,
       projectId: req.params.projectId,
@@ -79,8 +86,17 @@ router
       documentMapIconColor: req.params.documentMapIconColor || '#000000',
     };
 
-    db.Tag.authorizeData(data, 'create', req.user)
-      .create(data)
+    Promise.resolve()
+      .then(() => {
+        if (isSeqnrProvided(data.seqnr)) return;
+        // Grouped by type only, matching the renumber hook in models/Tag.js.
+        return db.Tag.max('seqnr', { where: { type: data.type } }).then(
+          (maxSeqnr) => {
+            data.seqnr = resolveSeqnr(data.seqnr, maxSeqnr);
+          }
+        );
+      })
+      .then(() => db.Tag.authorizeData(data, 'create', req.user).create(data))
       .then((result) => {
         res.json(result);
       })
