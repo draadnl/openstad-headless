@@ -44,6 +44,7 @@ router
   .post(auth.can('Project', 'create'))
   .post(removeProtocolFromUrl)
   .post(ctrl.checkUniqueUrl)
+  .post(ctrl.applyGlobalProjectDefaults)
   .post(rateLimiter(), ctrl.prepareDuplicationPayload)
   .post(ctrl.createProjectRecord)
   .post(ctrl.syncAuthProvidersAfterCreate)

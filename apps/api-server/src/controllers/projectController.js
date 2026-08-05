@@ -27,6 +27,7 @@ const {
 const {
   createDuplicateRollbackSessionStore,
 } = require('../util/duplicate-rollback-session');
+const { getGlobalProjectDefaults } = require('../util/global-project-defaults');
 const getWidgetSettings = require('../routes/widget/widget-settings');
 
 const dup = require('../services/projectDuplication');
@@ -386,6 +387,26 @@ function serializeProjectsList(req, res, next) {
 // Create project  (POST /)
 // ----------------------------------------------------------------------------
 
+async function applyGlobalProjectDefaults(req, res, next) {
+  // Seed new projects with the global defaults; values in the request always win.
+  try {
+    const globalDefaults = await getGlobalProjectDefaults();
+    req.body.config = merge.recursive(
+      true,
+      globalDefaults.config,
+      req.body.config || {}
+    );
+    req.body.emailConfig = merge.recursive(
+      true,
+      globalDefaults.emailConfig,
+      req.body.emailConfig || {}
+    );
+  } catch (err) {
+    console.log('Failed to apply global project defaults', err);
+  }
+  return next();
+}
+
 async function prepareDuplicationPayload(req, res, next) {
   const isDuplicationPayload = req.body.isDuplicateRequest === true;
   req.isDuplicationPayload = isDuplicationPayload;
@@ -443,8 +464,10 @@ async function prepareDuplicationPayload(req, res, next) {
   }
 
   // create an oauth client if nessecary
+  // emailConfig is passed along for the auth client's login sender; no row exists yet.
   let project = {
     config: req.body.config || {},
+    emailConfig: req.body.emailConfig || {},
   };
   try {
     project.name = project?.name || req.body?.name || '';
@@ -935,7 +958,11 @@ async function updateAuthClients(req, res, next) {
 }
 
 async function updateProjectRecord(req, res, next) {
-  const project = await db.Project.findOne({ where: { id: req.results.id } });
+  // includeEmailConfig is required: the setter merges the posted value into the loaded
+  // one, so without the scope a partial update resets every sibling field to its default.
+  const project = await db.Project.scope('includeEmailConfig').findOne({
+    where: { id: req.results.id },
+  });
   if (!(project && project.can && project.can('update')))
     return next(new Error('You cannot update this project'));
 
@@ -1246,6 +1273,7 @@ module.exports = {
   listProjects,
   serializeProjectsList,
   // create
+  applyGlobalProjectDefaults,
   prepareDuplicationPayload,
   createProjectRecord,
   syncAuthProvidersAfterCreate,
