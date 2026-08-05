@@ -43,6 +43,9 @@ const formSchema = z.object({
   comments: componentSchema,
   submissions: componentSchema,
   choiceguides: componentSchema,
+  projects: componentSchema,
+  choiceguideguides: componentSchema,
+  choiceguidequestions: componentSchema,
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -188,7 +191,7 @@ export default function ProjectSettingsDataScope() {
                         {enabled && def.personalFields.length > 0 && (
                           <div className="pl-2 border-l-2 border-yellow-300 space-y-2">
                             <p className="text-sm font-medium text-muted-foreground">
-                              Optionele persoonsvelden (gepseudonimiseerd)
+                              Optionele persoonsvelden
                             </p>
                             <FormField
                               control={form.control}
