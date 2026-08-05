@@ -5,6 +5,11 @@ const {
   COMPONENTS,
 } = require('@openstad-headless/lib/report-data-scope');
 const auditLogService = require('../services/audit-log');
+const {
+  fromPlainError,
+  sendProblem,
+} = require('../lib/reporting/problem-json');
+const { API_VERSION } = require('../lib/reporting/api-version');
 
 // GET-routed paths that actually mutate state — must be blocked even for
 // reporting tokens that only send GET requests.
@@ -25,6 +30,14 @@ const OVERVIEW_SEGMENT = 'overview';
 // enabling e.g. just 'votes' reporting silently unlock the full participant
 // list too).
 const USER_DATA_SEGMENTS = new Set(['anonymized', 'aggregates']);
+
+// The OpenAPI spec is documentation, not project data. reports/index.js mounts
+// it BEFORE the auth gate, so it is already served to anyone without a token —
+// blocking it for a request that DOES carry one would be a pure usability
+// defect, since every real client (Power BI, Swagger UI, generated SDKs) sends
+// Authorization on every request. Allowed independently of dataScope for the
+// same reason: there is no project data here to scope.
+const SPEC_SEGMENT = 'openapi.json';
 
 const ALLOWED_NON_COMPONENT_SEGMENTS = new Set([
   OVERVIEW_SEGMENT,
@@ -118,11 +131,19 @@ function apiTokenScopeGuard(req, res, next) {
     return next();
   }
 
+  // NLgov API Design Rules: every reporting response must carry API-Version,
+  // not just the URI's /v1 segment. This guard is mounted globally, BEFORE
+  // routes/api/reports/index.js (see Server.js), so a 403 sent from here
+  // would otherwise never reach that router's own API-Version middleware.
+  res.set('API-Version', API_VERSION);
+
   // Reporting tokens are strictly read-only.
   if (req.method !== 'GET') {
-    return res
-      .status(403)
-      .json({ error: 'Reporting tokens only allow GET requests' });
+    return sendProblem(
+      res,
+      403,
+      fromPlainError(403, 'Reporting tokens only allow GET requests')
+    );
   }
 
   // Block GET paths that mutate state (exact path-segment matching).
@@ -132,9 +153,11 @@ function apiTokenScopeGuard(req, res, next) {
     if (idx !== -1) {
       const after = pathLower[idx + segment.length];
       if (after === undefined || after === '/' || after === '?') {
-        return res
-          .status(403)
-          .json({ error: 'Path not allowed for reporting tokens' });
+        return sendProblem(
+          res,
+          403,
+          fromPlainError(403, 'Path not allowed for reporting tokens')
+        );
       }
     }
   }
@@ -153,9 +176,14 @@ function apiTokenScopeGuard(req, res, next) {
     const componentCfg = dataScope && dataScope[componentKey];
 
     if (!componentCfg || !componentCfg.enabled) {
-      return res.status(403).json({
-        error: `Component '${componentKey}' is not enabled for this project's reporting scope`,
-      });
+      return sendProblem(
+        res,
+        403,
+        fromPlainError(
+          403,
+          `Component '${componentKey}' is not enabled for this project's reporting scope`
+        )
+      );
     }
 
     req.reportingScope = {
@@ -171,13 +199,29 @@ function apiTokenScopeGuard(req, res, next) {
     // so an allowlisted word elsewhere in the path cannot open it up.
     const segments = pathLower.split('/').filter(Boolean);
     const lastSegment = segments[segments.length - 1];
+
+    // Checked before the dataScope-dependent branches below: the spec must
+    // stay readable even for a project that has enabled no components at all.
+    // A scope is still attached, because report-field-filter blocks any
+    // reporting response that reaches it without one.
+    if (lastSegment === SPEC_SEGMENT) {
+      req.reportingScope = {
+        componentKey: null,
+        enabledPersonalFields: [],
+        aggregate: false,
+      };
+      return next();
+    }
+
     const allowed = ALLOWED_NON_COMPONENT_SEGMENTS.has(lastSegment);
 
     if (!allowed) {
       logBlockedReportingPath(req).catch(() => {});
-      return res
-        .status(403)
-        .json({ error: 'Path not allowed for reporting tokens' });
+      return sendProblem(
+        res,
+        403,
+        fromPlainError(403, 'Path not allowed for reporting tokens')
+      );
     }
 
     if (USER_DATA_SEGMENTS.has(lastSegment)) {
@@ -193,10 +237,14 @@ function apiTokenScopeGuard(req, res, next) {
 
       if (!usersEnabled) {
         logBlockedReportingPath(req).catch(() => {});
-        return res.status(403).json({
-          error:
-            "The 'users' reporting component is not enabled for this project's reporting scope",
-        });
+        return sendProblem(
+          res,
+          403,
+          fromPlainError(
+            403,
+            "The 'users' reporting component is not enabled for this project's reporting scope"
+          )
+        );
       }
 
       req.reportingScope = {
@@ -213,9 +261,14 @@ function apiTokenScopeGuard(req, res, next) {
     const enabledComponents = getEnabledComponents(req);
     if (enabledComponents.length === 0) {
       logBlockedReportingPath(req).catch(() => {});
-      return res.status(403).json({
-        error: 'No reporting components are enabled for this project',
-      });
+      return sendProblem(
+        res,
+        403,
+        fromPlainError(
+          403,
+          'No reporting components are enabled for this project'
+        )
+      );
     }
 
     req.reportingScope = {
