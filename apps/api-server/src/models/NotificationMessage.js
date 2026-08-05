@@ -247,7 +247,18 @@ module.exports = (db, sequelize, DataTypes) => {
 
   NotificationMessage.prototype.send = async function () {
     try {
-      await sendMessage[this.engine]({ message: this });
+      // emailConfig is outside the default scope; no address means no header.
+      let replyTo;
+      try {
+        const project = await db.Project.scope('includeEmailConfig').findByPk(
+          this.projectId
+        );
+        replyTo = project?.emailConfig?.notifications?.replyTo || undefined;
+      } catch (err) {
+        console.log('Could not read reply-to address for notification', err);
+      }
+
+      await sendMessage[this.engine]({ message: this, replyTo });
       await this.update({ status: 'sent' });
     } catch (err) {
       console.error('Send failed:', err);
