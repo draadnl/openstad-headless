@@ -3,6 +3,11 @@ const mapUserData = require('../../util/map-user-data');
 const authSettings = require('../../util/auth-settings');
 const config = require('config');
 const db = require('../../db');
+const {
+  hasLoginValue,
+  readLoadedLoginSection,
+  toClientConfig,
+} = require('./login-mail-config');
 
 let service = {};
 
@@ -282,28 +287,21 @@ service.fetchClient = async function ({ authConfig, project }) {
 // Only non-empty values are returned, and emailConfig is read from the database when the
 // project was loaded with the default scope, which leaves it out.
 async function getLoginMailClientConfig(project) {
-  const hasValue = (login) =>
-    !!(login && (login.fromAddress || login.fromName || login.helpAddress));
-
-  let login = project?.emailConfig?.login;
-  if (!hasValue(login) && project?.id) {
+  let login = readLoadedLoginSection(project);
+  if (!hasLoginValue(login) && project?.id) {
     try {
       const withEmailConfig = await db.Project.scope(
         'includeEmailConfig'
       ).findByPk(project.id);
-      login = withEmailConfig?.emailConfig?.login;
+      login = readLoadedLoginSection(withEmailConfig);
     } catch (err) {
       console.log('Could not read login e-mail settings for auth client', err);
       return {};
     }
   }
-  if (!hasValue(login)) return {};
+  if (!hasLoginValue(login)) return {};
 
-  let clientConfig = {};
-  if (login.fromAddress) clientConfig.fromEmail = login.fromAddress;
-  if (login.fromName) clientConfig.fromName = login.fromName;
-  if (login.helpAddress) clientConfig.contactEmail = login.helpAddress;
-  return clientConfig;
+  return toClientConfig(login);
 }
 
 service.createClient = async function ({ authConfig, project }) {
