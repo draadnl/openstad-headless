@@ -1,5 +1,15 @@
 import { fetchSessionUser } from '@/auth-context';
+import { CopyableVar } from '@/components/copyable-var';
+import AccordionUI from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -10,18 +20,35 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Heading } from '@/components/ui/typography';
 import useNotificationTemplate, {
   useNotificationTemplateDefaults,
 } from '@/hooks/use-notification-template';
 import { useProject } from '@/hooks/use-project';
+import {
+  FIXED_BLOCKS_BY_TYPE,
+  NOTIFICATION_CONTENT_FIELDS,
+  NOTIFICATION_TYPE_LABELS,
+  NotificationContent,
+  NotificationType,
+  hasContent,
+  isPlainTextType,
+  normalizeContent,
+  renderNotificationMjml,
+  showsLogo,
+} from '@/lib/notification-content';
+import {
+  buildPreviewContext,
+  variablesForType,
+} from '@/lib/notification-variables';
 import { applyFilters } from '@/lib/nunjucks-filters';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/router';
 import nunjucks from 'nunjucks';
 import * as React from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import * as z from 'zod';
@@ -38,43 +65,13 @@ const nunjucksEnv = new nunjucks.Environment();
 applyFilters(nunjucksEnv);
 
 type Props = {
-  type:
-    | 'login email'
-    | 'login sms'
-    | 'new published resource - user feedback'
-    | 'new published resource - admin update'
-    | 'updated resource - user feedback'
-    | 'user account about to expire'
-    | 'new enquete - admin'
-    | 'new enquete - user'
-    | 'notification comment - user'
-    | 'notification comment reply - user';
+  type: NotificationType;
   engine?: 'email' | 'sms';
   id?: string;
   label?: string;
   subject?: string;
   body?: string;
-};
-
-const notificationTypes = {
-  'login email': 'Inloggen via e-mail',
-  'login sms': 'Inloggen via sms',
-  'new published resource - user feedback':
-    'Nieuwe resource gepubliceerd - Notificatie naar de gebruiker',
-  'new published resource - admin update':
-    'Nieuwe resource gepubliceerd - Notificatie naar de admin',
-  'updated resource - user feedback':
-    'Resource bijgewerkt - Notificatie naar de gebruiker',
-  'user account about to expire':
-    'Gebruikersaccount staat op het punt te verlopen',
-  'new enquete - admin':
-    'Nieuwe formulier inzending - Notificatie naar de admin',
-  'new enquete - user':
-    'Nieuwe formulier inzending - Notificatie naar de gebruiker',
-  'notification comment - user':
-    'Nieuwe reactie op een inzending - Notificatie naar de gebruiker',
-  'notification comment reply - user':
-    'Nieuwe reactie op een reactie - Notificatie naar de gebruiker',
+  content?: NotificationContent | null;
 };
 
 const formSchema = z.object({
@@ -98,7 +95,41 @@ const formSchema = z.object({
   body: z.string().min(1, {
     message: 'De inhoud mag niet leeg zijn!',
   }),
+  heading: z.string(),
+  greeting: z.string(),
+  intro: z.string(),
+  buttonLabel: z.string(),
+  buttonUrl: z.string(),
+  footer: z.string(),
+  showLogo: z.boolean(),
 });
+
+type FormValues = z.infer<typeof formSchema>;
+
+function contentFromValues(values: FormValues): NotificationContent {
+  return normalizeContent({
+    heading: values.heading,
+    greeting: values.greeting,
+    intro: values.intro,
+    buttonLabel: values.buttonLabel,
+    buttonUrl: values.buttonUrl,
+    footer: values.footer,
+    showLogo: values.showLogo,
+  });
+}
+
+function contentToValues(type: NotificationType, content: NotificationContent) {
+  const normalized = normalizeContent(content);
+  return {
+    heading: normalized.heading || '',
+    greeting: normalized.greeting || '',
+    intro: normalized.intro || '',
+    buttonLabel: normalized.buttonLabel || '',
+    buttonUrl: normalized.buttonUrl || '',
+    footer: normalized.footer || '',
+    showLogo: showsLogo(type, normalized),
+  };
+}
 
 export function NotificationForm({
   type,
@@ -107,70 +138,79 @@ export function NotificationForm({
   label,
   subject,
   body,
+  content,
 }: Props) {
   const router = useRouter();
   const project = router.query.project as string;
-  const { data, create, update } = useNotificationTemplate(project as string);
+  const { create, update } = useNotificationTemplate(project as string);
   const { data: defaultTemplates } = useNotificationTemplateDefaults(
     project as string
   );
   const defaultTemplate = defaultTemplates?.find((d) => d.type === type);
-  const notificationTitle = notificationTypes[type];
+  const notificationTitle = NOTIFICATION_TYPE_LABELS[type];
   const { data: projectData } = useProject();
+  const plainText = isPlainTextType(type);
+  const fixedBlockNotice = FIXED_BLOCKS_BY_TYPE[type];
 
-  type MailContextType = {
-    user: { name: string; fullName: string };
-    name: string;
-    loginurl: string;
-    imagePath: string;
-    logo: string;
-    projectName: string;
-    clientName: string;
-    resource: any;
-  };
-  const [mailContext, setMailContext] = useState<MailContextType>({
-    user: { name: 'Gebruiker', fullName: 'Gebruiker' },
-    name: 'Gebruiker',
-    loginurl: 'https://openstad.nl/login',
-    imagePath: process.env.EMAIL_ASSETS_URL || '',
-    logo: '',
-    projectName: 'Voorbeeldproject',
-    clientName: 'Voorbeeldklant',
-    resource: {
-      tags: [],
-    },
-  });
+  // Sample data comes from buildPreviewContext (one variable catalog for the
+  // whole app); these overrides replace a sample with the real thing wherever
+  // that's cheaply available client-side. clientName stays a sample - it is
+  // only resolvable server-side, see resolveClientName in NotificationMessage.js.
+  const [previewOverrides, setPreviewOverrides] = useState<Record<string, any>>(
+    {}
+  );
 
   useEffect(() => {
-    async function setUserNameInMailContext() {
+    async function setUserNameInPreview() {
       const user = await fetchSessionUser();
 
       if (user && user.name) {
-        setMailContext((prev: MailContextType) => {
-          return {
-            ...prev,
-            user: { name: user.name, fullName: user.name },
-            name: user.name,
-          };
-        });
+        setPreviewOverrides((prev) => ({
+          ...prev,
+          user: { name: user.name, fullName: user.name },
+          name: user.name,
+        }));
       }
     }
 
-    setUserNameInMailContext();
+    setUserNameInPreview();
   }, []);
 
   useEffect(() => {
     if (!projectData) return;
-    // clientName (the auth client name) is only resolvable server-side, so the
-    // preview keeps a placeholder for it - see NotificationMessage.js.
-    setMailContext((prev: MailContextType) => ({
+    setPreviewOverrides((prev) => ({
       ...prev,
       logo: projectData.emailConfig?.styling?.logo || prev.logo,
       projectName: projectData.title || projectData.name || prev.projectName,
+      projectUrl: projectData.url || prev.projectUrl,
+      project: {
+        title: projectData.title || projectData.name || '',
+        name: projectData.name || '',
+        url: projectData.url || '',
+      },
     }));
   }, [projectData]);
 
+  const mailContext = useMemo(
+    () => buildPreviewContext(type, previewOverrides),
+    [type, previewOverrides]
+  );
+
+  const styling = projectData?.emailConfig?.styling || {};
+
   const defaultValueBody = body || defaultTemplate?.body || '';
+  const defaultContent = useMemo(
+    () => normalizeContent(defaultTemplate?.content),
+    [defaultTemplate]
+  );
+  // A saved template with content is content-managed; one without is raw MJML
+  // someone may have edited by hand, so we do not overwrite it silently.
+  const savedContent = useMemo(() => normalizeContent(content), [content]);
+  const activeContent = id
+    ? hasContent(content)
+      ? savedContent
+      : defaultContent
+    : defaultContent;
 
   const defaults = React.useCallback(
     () => ({
@@ -178,29 +218,97 @@ export function NotificationForm({
       label: label || defaultTemplate?.label || '',
       subject: subject || defaultTemplate?.subject || '',
       body: defaultValueBody,
+      ...contentToValues(type, activeContent),
     }),
-    [engine, label, subject, defaultValueBody, defaultTemplate]
+    [
+      type,
+      engine,
+      label,
+      subject,
+      defaultValueBody,
+      defaultTemplate,
+      activeContent,
+    ]
   );
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<FormValues>({
     resolver: zodResolver<any>(formSchema),
     defaultValues: defaults(),
   });
 
   const { watch } = form;
-  const fieldValue = watch('body'); // Assuming 'engine' is the name of the field you're interested in
+  const fieldValue = watch('body');
+  const subjectValue = watch('subject');
 
   useEffect(() => {
     form.reset(defaults(), { keepDirtyValues: true });
   }, [form, defaults]);
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (label && subject && body !== undefined) {
+  const [contentManaged, setContentManaged] = useState<boolean>(
+    id ? hasContent(content) : true
+  );
+  // Which tab you look at is separate from how the template is managed:
+  // opening the HTML tab to read along must not silently change the mode.
+  const [activeTab, setActiveTab] = useState<'content' | 'html'>(
+    id && !hasContent(content) ? 'html' : 'content'
+  );
+
+  // Key on the value, not the object: the templates list refetches and hands us
+  // a fresh `content` object every time, which would otherwise reset an unsaved
+  // switch to manual HTML and regenerate over the admin's own markup.
+  const contentKey = JSON.stringify(savedContent);
+
+  useEffect(() => {
+    const managed = id ? hasContent(savedContent) : true;
+    setContentManaged(managed);
+    // Open on the tab that actually drives this template.
+    setActiveTab(managed ? 'content' : 'html');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, contentKey]);
+
+  const watchedContent = watch([
+    'heading',
+    'greeting',
+    'intro',
+    'buttonLabel',
+    'buttonUrl',
+    'footer',
+    'showLogo',
+  ]);
+
+  // In content mode the fields are the source: every keystroke regenerates the
+  // MJML in `body`, which drives both the preview and what gets saved.
+  useEffect(() => {
+    if (!contentManaged) return;
+    const rendered = renderNotificationMjml(
+      type,
+      contentFromValues(form.getValues()),
+      styling
+    );
+    if (rendered !== form.getValues('body')) {
+      form.setValue('body', rendered, { shouldDirty: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    contentManaged,
+    type,
+    JSON.stringify(watchedContent),
+    styling.logo,
+    styling.primaryColor,
+    styling.backgroundColor,
+    styling.textColor,
+  ]);
+
+  async function onSubmit(values: FormValues) {
+    const contentToSave = contentManaged ? contentFromValues(values) : null;
+
+    if (id) {
       const template = await update(
         id as string,
         values.label,
         values.subject,
-        values.body
+        values.body,
+        contentToSave
       );
       if (template) {
         toast.success('Template aangepast!');
@@ -214,7 +322,8 @@ export function NotificationForm({
         type,
         values.label,
         values.subject,
-        values.body
+        values.body,
+        contentToSave
       );
       if (template) {
         toast.success('Template aangemaakt!');
@@ -235,6 +344,7 @@ export function NotificationForm({
   }
 
   let mailTemplate: any = renderPreview(fieldValue || defaultValueBody || '');
+  const subjectPreview = renderPreview(subjectValue || '');
 
   const [error, setError] = useState<string | null>(null);
 
@@ -262,6 +372,7 @@ export function NotificationForm({
 
   useEffect(() => {
     convertMJMLToHTML();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mailContext]);
 
   const handleOnChange = (e: any, field: any) => {
@@ -284,30 +395,59 @@ export function NotificationForm({
         setError('Er is een fout opgetreden bij het renderen van de template.');
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fieldValue]);
 
-  const [confirmRestoreDefault, setConfirmRestoreDefault] = useState(false);
-
-  useEffect(() => {
-    if (!confirmRestoreDefault) return;
-    const timeout = setTimeout(() => setConfirmRestoreDefault(false), 4000);
-    return () => clearTimeout(timeout);
-  }, [confirmRestoreDefault]);
+  const [isRestoreDialogOpen, setIsRestoreDialogOpen] = useState(false);
+  const [isSwitchDialogOpen, setIsSwitchDialogOpen] = useState(false);
+  const [isManualDialogOpen, setIsManualDialogOpen] = useState(false);
 
   function handleRestoreDefault() {
     if (!defaultTemplate) return;
-    if (!confirmRestoreDefault) {
-      setConfirmRestoreDefault(true);
-      return;
-    }
+    const managed = hasContent(defaultTemplate.content);
+    // With content mode on, `body` must be what the fields produce - otherwise
+    // the read-only HTML tab shows the handwritten file markup and the mail
+    // silently changes shape the next time the page regenerates it.
+    const restoredBody = managed
+      ? renderNotificationMjml(type, defaultContent, styling)
+      : defaultTemplate.body;
     form.reset({
       engine: engine || 'email',
       label: defaultTemplate.label,
       subject: defaultTemplate.subject,
-      body: defaultTemplate.body,
+      body: restoredBody,
+      ...contentToValues(type, defaultContent),
     });
-    setConfirmRestoreDefault(false);
+    setContentManaged(managed);
+    setActiveTab(managed ? 'content' : 'html');
+    setIsRestoreDialogOpen(false);
   }
+
+  function handleSwitchToContent() {
+    // Prefer what this template had saved; only fall back to the shipped
+    // defaults when it never had content fields.
+    const target = hasContent(savedContent) ? savedContent : defaultContent;
+    form.reset(
+      {
+        ...form.getValues(),
+        ...contentToValues(type, target),
+      },
+      { keepDirtyValues: false }
+    );
+    setContentManaged(true);
+    setIsSwitchDialogOpen(false);
+    setActiveTab('content');
+  }
+
+  function handleSwitchToManual() {
+    setContentManaged(false);
+    setIsManualDialogOpen(false);
+    setActiveTab('html');
+  }
+
+  const contentFields = plainText
+    ? NOTIFICATION_CONTENT_FIELDS.filter((field) => field.key === 'intro')
+    : NOTIFICATION_CONTENT_FIELDS;
 
   return (
     <div>
@@ -370,27 +510,140 @@ export function NotificationForm({
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="body"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Inhoud</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Inhoud van de mail..."
-                        defaultValue={
-                          field.value.length > 0 ? field.value : body
-                        }
-                        rows={20}
-                        onKeyUpCapture={(e) => handleOnChange(e, field)}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+
+              <Tabs
+                value={activeTab}
+                onValueChange={(value) =>
+                  setActiveTab(value as 'content' | 'html')
+                }>
+                <TabsList>
+                  <TabsTrigger value="content">Inhoud</TabsTrigger>
+                  <TabsTrigger value="html">
+                    {plainText ? 'Platte tekst' : 'HTML'}
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent
+                  value="content"
+                  forceMount
+                  className="space-y-4 pt-4 data-[state=inactive]:hidden">
+                  {contentManaged ? null : (
+                    <div className="rounded-md border border-input p-4 space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        Deze e-mail wordt op dit moment als{' '}
+                        {plainText ? 'tekst' : 'HTML'} beheerd. De velden
+                        hieronder worden pas gebruikt als je overstapt.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsSwitchDialogOpen(true)}>
+                        Overstappen op inhoudsvelden
+                      </Button>
+                    </div>
+                  )}
+                  {plainText && (
+                    <p className="text-sm text-muted-foreground">
+                      Sms versturen is nog niet beschikbaar in OpenStad. Je legt
+                      hier alleen de tekst vast.
+                    </p>
+                  )}
+                  {fixedBlockNotice && (
+                    <p className="text-sm text-muted-foreground">
+                      {fixedBlockNotice}
+                    </p>
+                  )}
+                  {!plainText && (
+                    <FormField
+                      control={form.control}
+                      name="showLogo"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center gap-2 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={(checked) =>
+                                field.onChange(checked === true)
+                              }
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal">
+                            Logo bovenaan deze e-mail tonen
+                          </FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                  {contentFields.map((contentField) => (
+                    <FormField
+                      key={contentField.key}
+                      control={form.control}
+                      name={contentField.key}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{contentField.label}</FormLabel>
+                          <FormControl>
+                            {contentField.input === 'textarea' ? (
+                              <Textarea rows={5} {...field} />
+                            ) : (
+                              <Input {...field} />
+                            )}
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ))}
+                  {contentManaged && form.formState.errors.body && (
+                    // The body field lives in the other panel, which is hidden.
+                    // Without this the save button would just do nothing.
+                    <p className="text-sm font-medium text-destructive">
+                      {form.formState.errors.body.message}
+                    </p>
+                  )}
+                </TabsContent>
+
+                <TabsContent
+                  value="html"
+                  forceMount
+                  className="pt-4 data-[state=inactive]:hidden">
+                  <FormField
+                    control={form.control}
+                    name="body"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Inhoud</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Inhoud van de mail..."
+                            rows={20}
+                            readOnly={contentManaged}
+                            onKeyUpCapture={(e) => handleOnChange(e, field)}
+                            {...field}
+                          />
+                        </FormControl>
+                        {contentManaged && (
+                          <div className="space-y-3 pt-2">
+                            <p className="text-sm text-muted-foreground">
+                              Deze {plainText ? 'tekst' : 'HTML'} wordt
+                              gegenereerd uit de inhoudsvelden en is daarom niet
+                              te bewerken.
+                            </p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setIsManualDialogOpen(true)}>
+                              {plainText ? 'Tekst' : 'HTML'} zelf beheren
+                            </Button>
+                          </div>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </TabsContent>
+              </Tabs>
+
               <div className="flex items-center gap-2">
                 <Button type="submit" disabled={!!error}>
                   Opslaan
@@ -398,18 +651,21 @@ export function NotificationForm({
                 <Button
                   type="button"
                   variant="outline"
-                  aria-live="polite"
                   disabled={!defaultTemplate}
-                  onClick={handleRestoreDefault}>
-                  {confirmRestoreDefault
-                    ? 'Weet je het zeker?'
-                    : 'Herstel standaard'}
+                  onClick={() => setIsRestoreDialogOpen(true)}>
+                  Herstel standaard
                 </Button>
               </div>
               {error && <p className="text-red-500">{error}</p>}
             </form>
 
-            <div className="p-4">
+            <div className="p-4 space-y-4">
+              <div>
+                <p className="text-sm font-medium">Onderwerp</p>
+                <p className="text-sm text-muted-foreground">
+                  {subjectPreview || '—'}
+                </p>
+              </div>
               <iframe
                 className="email-iframe"
                 sandbox=""
@@ -418,8 +674,138 @@ export function NotificationForm({
                 width={500}></iframe>
             </div>
           </div>
+
+          {/* Not the fixed-height preview column: the iframe's height:100%
+              otherwise locks the row height and an opened accordion overflows
+              into the next mail. Also not full width: AccordionUI's header
+              spaces the chevron to the far edge of its container. */}
+          <div className="max-w-xl mt-6">
+            <AccordionUI
+              items={[
+                {
+                  header: `Beschikbare variabelen (${variablesForType(type).length})`,
+                  content: (
+                    <table className="w-full text-sm">
+                      <tbody>
+                        {variablesForType(type).map((variable) => (
+                          <tr key={variable.key}>
+                            <td className="pr-3 pb-2 align-top whitespace-nowrap">
+                              <CopyableVar expression={variable.key} />
+                            </td>
+                            <td className="pb-2 align-top text-muted-foreground">
+                              {variable.label}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ),
+                },
+              ]}
+            />
+          </div>
         </Form>
       </div>
+
+      <Dialog
+        open={isRestoreDialogOpen}
+        modal={true}
+        onOpenChange={setIsRestoreDialogOpen}>
+        <DialogContent>
+          <div>
+            <DialogTitle asChild>
+              <Heading size="lg">Weet je het zeker?</Heading>
+            </DialogTitle>
+            <DialogDescription className="mt-3 mb-6 text-sm text-muted-foreground">
+              Hiermee vervang je het label, het onderwerp en de inhoud van deze
+              template door de standaardversie. Je eigen wijzigingen gaan
+              verloren zodra je opslaat.
+            </DialogDescription>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setIsRestoreDialogOpen(false)}>
+                Annuleren
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleRestoreDefault}>
+                Herstel standaard
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isSwitchDialogOpen}
+        modal={true}
+        onOpenChange={setIsSwitchDialogOpen}>
+        <DialogContent>
+          <div>
+            <DialogTitle asChild>
+              <Heading size="lg">Overstappen op inhoudsvelden?</Heading>
+            </DialogTitle>
+            <DialogDescription className="mt-3 mb-6 text-sm text-muted-foreground">
+              De {plainText ? 'tekst' : 'HTML'} van deze e-mail wordt dan
+              opnieuw opgebouwd uit de losse velden. Handmatige aanpassingen in
+              de {plainText ? 'tekst' : 'HTML'} gaan verloren zodra je opslaat.
+            </DialogDescription>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setIsSwitchDialogOpen(false)}>
+                Annuleren
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleSwitchToContent}>
+                Overstappen
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isManualDialogOpen}
+        modal={true}
+        onOpenChange={setIsManualDialogOpen}>
+        <DialogContent>
+          <div>
+            <DialogTitle asChild>
+              <Heading size="lg">
+                {plainText ? 'Tekst' : 'HTML'} zelf beheren?
+              </Heading>
+            </DialogTitle>
+            <DialogDescription className="mt-3 mb-6 text-sm text-muted-foreground">
+              De inhoudsvelden sturen deze e-mail dan niet meer aan. Je beheert
+              de {plainText ? 'tekst' : 'HTML'} vanaf dat moment zelf.
+            </DialogDescription>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setIsManualDialogOpen(false)}>
+                Annuleren
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleSwitchToManual}>
+                Zelf beheren
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

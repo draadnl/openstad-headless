@@ -371,6 +371,7 @@ export default function ProjectSettingsUsers(
                     id={template?.id}
                     subject={template?.subject}
                     body={template?.body}
+                    content={template?.content}
                   />
                 </Form>
               </div>
