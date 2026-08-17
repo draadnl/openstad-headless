@@ -3,8 +3,12 @@ const path = require('path');
 
 const TEMPLATES_DIR = path.join(__dirname, 'default-templates');
 
-const SUBJECT_BODY_REGEX =
-  /<subject>((?:.|\r|\n)*)<\/subject>(?:.|\r|\n)*<body>((?:.|\r|\n)*)<\/body>/;
+// One regex per block, each with a named group. Matching them separately keeps
+// the blocks independent: adding one does not shift another one's capture
+// index, and a template file without a <content> block still parses.
+const SUBJECT_REGEX = /<subject>([\s\S]*?)<\/subject>/;
+const CONTENT_REGEX = /<content>([\s\S]*?)<\/content>/;
+const BODY_REGEX = /<body>([\s\S]*)<\/body>/;
 
 // Dutch labels for the notification types exposed in the admin UI.
 // Keep in sync with `notificationTypes` in
@@ -38,15 +42,38 @@ function resolveTemplatePath(type) {
   return resolved;
 }
 
+function parseContentBlock(file) {
+  const match = file.match(CONTENT_REGEX);
+  if (!match) return null;
+  try {
+    const parsed = JSON.parse(match[1]);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return null;
+    }
+    return parsed;
+  } catch (err) {
+    // A broken <content> block must not take the whole template down; the
+    // admin falls back to the HTML tab.
+    return null;
+  }
+}
+
 async function parseTemplateFile(type) {
   // `type` reaches this function from request bodies (see routes/notification),
   // so keep the lookup inside TEMPLATES_DIR.
   const file = (await fs.readFile(resolveTemplatePath(type))).toString();
-  const match = file.match(SUBJECT_BODY_REGEX);
-  const subject = match && match[1];
-  const body = match && match[2];
+  const subjectMatch = file.match(SUBJECT_REGEX);
+  const bodyMatch = file.match(BODY_REGEX);
+  const subject = subjectMatch && subjectMatch[1];
+  const body = bodyMatch && bodyMatch[1];
   if (!subject || !body) return null;
-  return { type, label: TYPE_LABELS[type] || type, subject, body };
+  return {
+    type,
+    label: TYPE_LABELS[type] || type,
+    subject,
+    body,
+    content: parseContentBlock(file),
+  };
 }
 
 async function getDefaultTemplate(type) {
