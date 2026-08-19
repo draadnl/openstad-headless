@@ -9,10 +9,30 @@ const sanitize = require('../../util/sanitize');
 // while the model stores 'theme'.
 function normalizeTagType(type) {
   if (!type) return null;
+  // A truthy non-string is returned untouched: coercing it with String() would
+  // turn junk into a real tag group (['a', 'b'] becomes 'a,b'). Callers reject
+  // it with isValidTagType() before this point.
+  if (typeof type !== 'string') return type;
   // The setter stores null for any falsy value, so a type that sanitizes down
   // to an empty string must become null here too - otherwise the lookup below
   // would query '' while the row is stored as null.
-  return sanitize.safeTags(String(type).trim()) || null;
+  return sanitize.safeTags(type.trim()) || null;
+}
+
+// A JSON body can carry any type, while the model setter assumes a string and
+// calls .trim() on it. Only strings and the falsy values the model stores as
+// null are acceptable; anything else is a bad request.
+function isValidTagType(type) {
+  if (!type) return true;
+  return typeof type === 'string';
+}
+
+// Same trust boundary as isValidTagType, for the sibling field stored the same
+// way: the `name` setter calls sanitize.title(text.trim()), so any non-string
+// throws inside the model. The name is required, so a missing one is rejected
+// here too; an empty string still falls through to the model's own validation.
+function isValidTagName(name) {
+  return typeof name === 'string';
 }
 
 // A sequence number counts as provided only when it is a finite number, or a
@@ -39,6 +59,8 @@ function resolveSeqnr(providedSeqnr, maxSeqnrInGroup) {
 
 module.exports = {
   normalizeTagType,
+  isValidTagType,
+  isValidTagName,
   isSeqnrProvided,
   resolveSeqnr,
 };

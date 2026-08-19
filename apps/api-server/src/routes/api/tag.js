@@ -3,8 +3,11 @@ const db = require('../../db');
 const auth = require('../../middleware/sequelize-authorization-middleware');
 const pagination = require('../../middleware/pagination');
 const rateLimiter = require('@openstad-headless/lib/rateLimiter');
+const createError = require('http-errors');
 const {
   normalizeTagType,
+  isValidTagType,
+  isValidTagName,
   isSeqnrProvided,
   resolveSeqnr,
 } = require('./tagHelpers');
@@ -72,6 +75,14 @@ router
   // ---------------
   .post(auth.can('Tag', 'create'))
   .post(rateLimiter(), function (req, res, next) {
+    if (!isValidTagName(req.body.name)) {
+      return next(createError(400, 'Tag name must be a string'));
+    }
+
+    if (!isValidTagType(req.body.type)) {
+      return next(createError(400, 'Tag type must be a string'));
+    }
+
     const data = {
       name: req.body.name,
       // Normalised up front so the seqnr lookup below queries the same value

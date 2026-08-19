@@ -218,10 +218,10 @@ export default function ProjectTagEdit({ preset }: { preset?: string }) {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>
-                            Volgorde (optioneel)
+                            Volgorde
                             <InfoDialog
                               content={
-                                'Dit nummer bepaalt de volgorde waarin de tags worden getoond. Laat je dit veld leeg, dan wordt de tag automatisch onderaan de groep geplaatst. Automatisch worden tientallen gegenereerd, zodat je later ruimte hebt om tags tussen te voegen.'
+                                'Dit nummer bepaalt de volgorde waarin de tags worden getoond. Automatisch worden tientallen gegenereerd, zodat je later ruimte hebt om tags tussen te voegen.'
                               }
                             />
                           </FormLabel>

@@ -2,6 +2,8 @@ import { describe, expect, test } from 'vitest';
 
 import {
   isSeqnrProvided,
+  isValidTagName,
+  isValidTagType,
   normalizeTagType,
   resolveSeqnr,
 } from './tagHelpers.js';
@@ -30,8 +32,43 @@ describe('normalizeTagType', () => {
     expect(normalizeTagType(normalizeTagType(' theme '))).toBe('theme');
   });
 
-  test('accepts non-string input without throwing', () => {
-    expect(normalizeTagType(42)).toBe('42');
+  test('leaves a truthy non-string untouched, so the caller can reject it', () => {
+    // Coercing it here would turn junk into a real tag group: ['a', 'b']
+    // would become the type 'a,b' and {} the type '[object Object]'.
+    expect(normalizeTagType(42)).toBe(42);
+    expect(normalizeTagType(['a', 'b'])).toEqual(['a', 'b']);
+  });
+});
+
+describe('isValidTagType', () => {
+  test('accepts strings and the falsy values the model stores as null', () => {
+    expect(isValidTagType(undefined)).toBe(true);
+    expect(isValidTagType(null)).toBe(true);
+    expect(isValidTagType('')).toBe(true);
+    expect(isValidTagType('theme')).toBe(true);
+  });
+
+  test('rejects a truthy non-string instead of coercing it into a tag group', () => {
+    expect(isValidTagType(42)).toBe(false);
+    expect(isValidTagType(true)).toBe(false);
+    expect(isValidTagType(['a', 'b'])).toBe(false);
+    expect(isValidTagType({ x: 1 })).toBe(false);
+  });
+});
+
+describe('isValidTagName', () => {
+  test('accepts a string, so the model setter can trim it', () => {
+    expect(isValidTagName('Verkeer')).toBe(true);
+    // An empty name is left to the model's own allowNull validation.
+    expect(isValidTagName('')).toBe(true);
+  });
+
+  test('rejects a missing name and any non-string', () => {
+    expect(isValidTagName(undefined)).toBe(false);
+    expect(isValidTagName(null)).toBe(false);
+    expect(isValidTagName(42)).toBe(false);
+    expect(isValidTagName(['a'])).toBe(false);
+    expect(isValidTagName({ x: 1 })).toBe(false);
   });
 });
 
