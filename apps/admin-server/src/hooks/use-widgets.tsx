@@ -113,7 +113,13 @@ export function useWidgetsHook(projectId?: string) {
       return data;
     } else {
       const body = await res.json().catch(() => null);
-      throw new Error(body?.message || 'Could not copy the widgets');
+      // Carry the status so the caller can phrase its own message; the API's
+      // messages are English and the admin interface is Dutch.
+      const error: Error & { status?: number } = new Error(
+        body?.message || 'Could not copy the widgets'
+      );
+      error.status = res.status;
+      throw error;
     }
   }
 

@@ -9,7 +9,7 @@ const createError = require('http-errors');
 const {
   canUserUseSourceProjectForDuplication,
   canUserWriteToProject,
-  updateWidgetIds,
+  remapWidgetConfigForProject,
   buildTargetMaps,
 } = require('../../util/widget-copy');
 router.all('*', function (req, res, next) {
@@ -198,9 +198,14 @@ router
     const sourceProjectId = parseInt(req.body.sourceProjectId, 10);
     let ids = req.body.ids;
 
-    if (!Number.isInteger(sourceProjectId)) {
+    // `>= 1`, not just an integer: the permission check treats a falsy source
+    // project as "no source project" and returns true, so 0 would skip it.
+    if (!Number.isInteger(sourceProjectId) || sourceProjectId < 1) {
       return next(
-        createError(400, 'Invalid request: sourceProjectId must be an integer')
+        createError(
+          400,
+          'Invalid request: sourceProjectId must be a positive integer'
+        )
       );
     }
     if (sourceProjectId === targetProjectId) {
@@ -221,7 +226,7 @@ router
 
     try {
       const canUseSourceProject = await canUserUseSourceProjectForDuplication({
-        req,
+        user: req.user,
         sourceProjectId,
       });
       if (!canUseSourceProject) {
@@ -234,7 +239,7 @@ router
       }
 
       const canWriteToTargetProject = await canUserWriteToProject({
-        req,
+        user: req.user,
         targetProjectId,
       });
       if (!canWriteToTargetProject) {
@@ -267,7 +272,7 @@ router
         }
       }
 
-      const { tagMap, statusMap } = await buildTargetMaps(
+      const { tagMap, statusMap, markerSetMap } = await buildTargetMaps(
         sourceProjectId,
         targetProjectId
       );
@@ -297,17 +302,27 @@ router
         // Pass 2: remap project-specific references in each copy's config.
         for (const newWidget of created) {
           const config = JSON.parse(JSON.stringify(newWidget.config || {}));
-          updateWidgetIds(
-            config,
+          const { clearedKeys } = remapWidgetConfigForProject(config, {
             widgetMap,
-            {}, // no resourceMap: resources are not copied, so resourceId is cleared
+            // No resourceMap: resources are not copied, so resourceId is cleared.
+            resourceMap: {},
             tagMap,
             statusMap,
-            targetProjectId,
-            { clearUnmappedTagsAndStatuses: true }
-          );
+            markerSetMap,
+            projectId: targetProjectId,
+          });
           config.projectId = targetProjectId;
           await newWidget.update({ config }, { transaction });
+
+          // Logged, not silent: a cleared reference is a visible difference
+          // between the source widget and its copy.
+          if (clearedKeys.length) {
+            console.log(
+              `[widget-copy] widget ${newWidget.id}: cleared ${clearedKeys.join(
+                ', '
+              )} (no equivalent in project ${targetProjectId})`
+            );
+          }
         }
 
         return created;

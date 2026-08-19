@@ -2,99 +2,99 @@ const db = require('../db');
 const { Op } = require('sequelize');
 const hasRole = require('../lib/sequelize-authorization/lib/hasRole');
 const {
-  updateWidgetIds,
-  TAG_ID_KEYS,
-  STATUS_ID_KEYS,
-  WIDGET_ID_KEYS,
-} = require('./widget-config-remap');
+  canUserUseSourceProjectForDuplication,
+} = require('../services/authClientSync');
+const { remapWidgetConfigForProject } = require('./widget-config-remap');
+const {
+  tagIdentity,
+  statusIdentity,
+  markerSetIdentity,
+  buildIdMap,
+} = require('./widget-copy-matching');
 
-// Whether the requesting user is allowed to use sourceProjectId as the
-// source of a widget/project duplication (superuser, or admin/editor on
-// the source project).
-async function canUserUseSourceProjectForDuplication({ req, sourceProjectId }) {
-  if (!sourceProjectId) return true;
-  if (hasRole(req.user, 'superuser')) return true;
-
-  const identifier = req.user?.idpUser?.identifier;
-  const provider = req.user?.idpUser?.provider;
-  if (!identifier || !provider) return false;
-
-  const sourceProjectUser = await db.User.findOne({
-    where: {
-      projectId: sourceProjectId,
-      idpUser: { identifier, provider },
-      [Op.or]: [{ role: 'admin' }, { role: 'editor' }],
-    },
-  });
-
-  return !!sourceProjectUser;
-}
-
-// Whether the requesting user may create content in targetProjectId.
+// Whether the user is an admin or editor of the given project.
 //
-// A role check alone is not enough here: `req.user.role` comes from a User row
-// that, for fixed API tokens, is not scoped to the project in the URL. Copying
-// widgets INTO a project is a write, so membership of the target project is
-// verified explicitly, the same way the source project is.
-async function canUserWriteToProject({ req, targetProjectId }) {
-  if (hasRole(req.user, 'superuser')) return true;
+// A role check alone is not enough: `req.user.role` comes from a User row that,
+// for fixed API tokens, is not scoped to the project in the URL. So membership
+// of the project is verified explicitly.
+async function hasProjectMembership({ user, projectId }) {
+  if (hasRole(user, 'superuser')) return true;
 
-  const identifier = req.user?.idpUser?.identifier;
-  const provider = req.user?.idpUser?.provider;
+  const identifier = user?.idpUser?.identifier;
+  const provider = user?.idpUser?.provider;
   if (!identifier || !provider) return false;
 
-  const targetProjectUser = await db.User.findOne({
+  const projectUser = await db.User.findOne({
     where: {
-      projectId: targetProjectId,
+      projectId,
       idpUser: { identifier, provider },
       [Op.or]: [{ role: 'admin' }, { role: 'editor' }],
     },
   });
 
-  return !!targetProjectUser;
+  return !!projectUser;
 }
 
-// Builds tagMap/statusMap for a widget-only copy between two DIFFERENT
-// projects, matching source tags/statuses to the target project's
-// tags/statuses by name. Unmatched source tags/statuses are simply absent
-// from the returned maps (see clearUnmappedTagsAndStatuses above).
+// Whether the user may create content in targetProjectId. Copying widgets INTO a
+// project is a write, so the target is verified the same way as the source.
+async function canUserWriteToProject({ user, targetProjectId }) {
+  return hasProjectMembership({ user, projectId: targetProjectId });
+}
+
+// Global tags live at projectId 0 -- see the `forProjectId` scope in models/Tag.js
+// -- and the admin tag pickers offer them alongside a project's own tags, so a
+// widget can reference one. Their ids are already valid in the target project.
+const GLOBAL_TAG_PROJECT_ID = 0;
+
+// Builds the id maps for a widget copy between two DIFFERENT projects, by
+// matching the source project's rows to the target project's equivalents by name.
+// Unmatched and ambiguous ones are absent from the returned maps, which makes the
+// remap clear those references rather than point them at the source project.
 async function buildTargetMaps(sourceProjectId, targetProjectId) {
-  const [sourceTags, targetTags, sourceStatuses, targetStatuses] =
-    await Promise.all([
-      db.Tag.findAll({ where: { projectId: sourceProjectId } }),
-      db.Tag.findAll({ where: { projectId: targetProjectId } }),
-      db.Status.findAll({ where: { projectId: sourceProjectId } }),
-      db.Status.findAll({ where: { projectId: targetProjectId } }),
-    ]);
+  const [
+    sourceTags,
+    targetTags,
+    globalTags,
+    sourceStatuses,
+    targetStatuses,
+    sourceMarkerSets,
+    targetMarkerSets,
+  ] = await Promise.all([
+    db.Tag.findAll({ where: { projectId: sourceProjectId } }),
+    db.Tag.findAll({ where: { projectId: targetProjectId } }),
+    db.Tag.findAll({ where: { projectId: GLOBAL_TAG_PROJECT_ID } }),
+    // Statuses have no global equivalent; see models/Status.js.
+    db.Status.findAll({ where: { projectId: sourceProjectId } }),
+    db.Status.findAll({ where: { projectId: targetProjectId } }),
+    // A marker set belongs to a project (models/Markers.js associates Project),
+    // and a map widget stores `markerSets: [{ id, name }]`.
+    db.Markers.findAll({ where: { projectId: sourceProjectId } }),
+    db.Markers.findAll({ where: { projectId: targetProjectId } }),
+  ]);
 
-  const targetTagIdByName = new Map(
-    targetTags.map((tag) => [tag.name, tag.id])
-  );
-  const targetStatusIdByName = new Map(
-    targetStatuses.map((status) => [status.name, status.id])
-  );
-
-  const tagMap = {};
-  sourceTags.forEach((tag) => {
-    const targetId = targetTagIdByName.get(tag.name);
-    if (targetId) tagMap[tag.id] = targetId;
+  // A global tag maps onto itself, and it has to do so unconditionally rather
+  // than by name: matching by name breaks as soon as the target project owns a
+  // tag with the same type and name, because that identity then reads as
+  // ambiguous and the reference would be cleared for no reason.
+  const tagMap = buildIdMap(sourceTags, targetTags, tagIdentity);
+  globalTags.forEach((tag) => {
+    tagMap[tag.id] = tag.id;
   });
 
-  const statusMap = {};
-  sourceStatuses.forEach((status) => {
-    const targetId = targetStatusIdByName.get(status.name);
-    if (targetId) statusMap[status.id] = targetId;
-  });
-
-  return { tagMap, statusMap };
+  return {
+    tagMap,
+    statusMap: buildIdMap(sourceStatuses, targetStatuses, statusIdentity),
+    markerSetMap: buildIdMap(
+      sourceMarkerSets,
+      targetMarkerSets,
+      markerSetIdentity
+    ),
+  };
 }
 
 module.exports = {
   canUserUseSourceProjectForDuplication,
   canUserWriteToProject,
-  updateWidgetIds,
+  remapWidgetConfigForProject,
   buildTargetMaps,
-  TAG_ID_KEYS,
-  STATUS_ID_KEYS,
-  WIDGET_ID_KEYS,
 };
