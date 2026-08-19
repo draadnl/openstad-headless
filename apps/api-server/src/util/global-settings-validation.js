@@ -21,6 +21,18 @@ const REQUIRED_EMAIL_FIELDS = [
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// The sections the required-address check is about. Other sections of emailConfig,
+// such as the notification styling, have their own form and must save without them.
+const SENDER_SECTIONS = ['notifications', 'login'];
+
+// Only enforce the required addresses when the request actually edits a sender
+// section. Without this a styling only save is blocked by fields its form cannot show.
+function touchesSenderSections(postedEmailConfig) {
+  return SENDER_SECTIONS.some((section) =>
+    Object.prototype.hasOwnProperty.call(postedEmailConfig || {}, section)
+  );
+}
+
 // The form posts one section, e.g. {login: {...}}. Lay it over what is stored so the
 // required-field check sees the resulting settings instead of just the posted part.
 function mergeEmailConfigSections(storedEmailConfig, postedEmailConfig) {
@@ -71,7 +83,9 @@ module.exports = {
   ALLOWED_CONFIG_KEYS,
   REQUIRED_EMAIL_FIELDS,
   EMAIL_REGEX,
+  SENDER_SECTIONS,
   mergeEmailConfigSections,
+  touchesSenderSections,
   validateEmailConfig,
   pickAllowedConfig,
 };

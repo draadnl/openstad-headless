@@ -27,7 +27,10 @@ const {
 const {
   createDuplicateRollbackSessionStore,
 } = require('../util/duplicate-rollback-session');
-const { getGlobalProjectDefaults } = require('../util/global-project-defaults');
+const {
+  copyGlobalLoginTemplate,
+  getGlobalProjectDefaults,
+} = require('../util/global-project-defaults');
 const getWidgetSettings = require('../routes/widget/widget-settings');
 
 const dup = require('../services/projectDuplication');
@@ -403,6 +406,18 @@ async function applyGlobalProjectDefaults(req, res, next) {
     );
   } catch (err) {
     console.log('Failed to apply global project defaults', err);
+  }
+  return next();
+}
+
+// Runs after the project and any duplicated data exist. Only the login mail is copied;
+// every other type is resolved at send time. Fails soft: a project without this row still
+// sends the login mail its auth client already has.
+async function copyGlobalLoginNotificationTemplate(req, res, next) {
+  try {
+    await copyGlobalLoginTemplate(req.results && req.results.id);
+  } catch (err) {
+    console.log('Failed to copy the global login template', err);
   }
   return next();
 }
@@ -1278,6 +1293,7 @@ module.exports = {
   createProjectRecord,
   syncAuthProvidersAfterCreate,
   createDuplicatedData,
+  copyGlobalLoginNotificationTemplate,
   addCurrentUserAsAdmin,
   publishNewProjectEvent,
   respondCreatedProject,

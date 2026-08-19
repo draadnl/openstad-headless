@@ -5,6 +5,7 @@ const rateLimiter = require('@openstad-headless/lib/rateLimiter');
 const {
   mergeEmailConfigSections,
   pickAllowedConfig,
+  touchesSenderSections,
   validateEmailConfig,
 } = require('../../util/global-settings-validation');
 
@@ -64,13 +65,19 @@ router
         updateData.config = allowed;
       }
 
-      // Only validate when the request changes the e-mail settings; the branding form
-      // posts config only and must not be blocked by fields it cannot edit.
+      // Only validate when the request changes a sender section; the branding form posts
+      // config only and the notification styling form posts emailConfig.styling. Neither
+      // may be blocked by fields it cannot edit.
       if (req.body.emailConfig) {
-        const errors = validateEmailConfig(
-          mergeEmailConfigSections(siteConfig.emailConfig, req.body.emailConfig)
-        );
-        if (errors.length) return res.status(400).json({ errors });
+        if (touchesSenderSections(req.body.emailConfig)) {
+          const errors = validateEmailConfig(
+            mergeEmailConfigSections(
+              siteConfig.emailConfig,
+              req.body.emailConfig
+            )
+          );
+          if (errors.length) return res.status(400).json({ errors });
+        }
         updateData.emailConfig = req.body.emailConfig;
       }
 

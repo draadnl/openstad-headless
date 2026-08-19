@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   mergeEmailConfigSections,
   pickAllowedConfig,
+  touchesSenderSections,
   validateEmailConfig,
 } from './global-settings-validation.js';
 
@@ -55,6 +56,39 @@ describe('validateEmailConfig', () => {
       'Notification sender e-mailaddress is required',
       'Reply to notifications e-mailaddress is required',
     ]);
+  });
+});
+
+describe('touchesSenderSections', () => {
+  it('is true for a post that changes the notification senders', () => {
+    expect(
+      touchesSenderSections({ notifications: { fromAddress: 'a@b.nl' } })
+    ).toBe(true);
+  });
+
+  it('is true for a post that changes the login senders', () => {
+    expect(touchesSenderSections({ login: { fromName: 'Gemeente' } })).toBe(
+      true
+    );
+  });
+
+  // The notification styling form posts only this section. Requiring the sender
+  // addresses there would block saving a logo before any address is filled in.
+  it('is false for a styling only post', () => {
+    expect(
+      touchesSenderSections({ styling: { logo: 'https://x.nl/l.png' } })
+    ).toBe(false);
+  });
+
+  it('is false for an empty or missing post', () => {
+    expect(touchesSenderSections({})).toBe(false);
+    expect(touchesSenderSections(undefined)).toBe(false);
+  });
+
+  it('is true as soon as one of the two sections rides along', () => {
+    expect(
+      touchesSenderSections({ styling: {}, login: { fromAddress: 'a@b.nl' } })
+    ).toBe(true);
   });
 });
 

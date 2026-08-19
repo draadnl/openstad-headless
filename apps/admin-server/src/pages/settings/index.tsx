@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import * as z from 'zod';
 
 import { ImageUploader } from '../../components/image-uploader';
+import { NotificationSettings } from '../../components/notification-settings';
 import { Button } from '../../components/ui/button';
 import {
   Form,
@@ -26,11 +27,9 @@ import {
 } from '../../components/ui/tabs';
 import { Heading } from '../../components/ui/typography';
 import { useGlobalSettings } from '../../hooks/use-global-settings';
+import { ADMIN_PROJECT_ID } from '../../lib/admin-project';
+import { GLOBAL_NOTIFICATION_SCOPE } from '../../lib/notification-scope';
 import ProjectTags from '../projects/[project]/tags';
-
-// ImageUploader needs a project id for the upload url; these settings have no project,
-// so branding uploads go through the admin project the session authenticates against.
-const ADMIN_PROJECT_ID = '1';
 
 function BrandingTab() {
   const { data, updateGlobalSettings } = useGlobalSettings();
@@ -349,6 +348,9 @@ export default function GlobalSettings({ apiUrl }: WithApiUrlProps) {
               <TabsTrigger value="display">Tags</TabsTrigger>
               <TabsTrigger value="branding">Branding</TabsTrigger>
               <TabsTrigger value="email">E-mail instellingen</TabsTrigger>
+              <TabsTrigger value="notifications">
+                Notificaties en e-mails
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="display" className="p-0">
               <ProjectTags preset="global" />
@@ -358,6 +360,9 @@ export default function GlobalSettings({ apiUrl }: WithApiUrlProps) {
             </TabsContent>
             <TabsContent value="email" className="p-0">
               <EmailTab />
+            </TabsContent>
+            <TabsContent value="notifications" className="p-0">
+              <NotificationSettings scope={GLOBAL_NOTIFICATION_SCOPE} />
             </TabsContent>
           </Tabs>
         </div>

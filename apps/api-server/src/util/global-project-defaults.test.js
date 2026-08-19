@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildProjectDefaults } from './global-project-defaults.js';
+import {
+  buildLoginTemplateRow,
+  buildProjectDefaults,
+  copyGlobalLoginTemplate,
+} from './global-project-defaults.js';
 
 describe('buildProjectDefaults', () => {
   it('returns empty defaults when there are no global settings', () => {
@@ -90,5 +94,121 @@ describe('buildProjectDefaults', () => {
 
   it('tolerates a site config without config or emailConfig', () => {
     expect(buildProjectDefaults({})).toEqual({ config: {}, emailConfig: {} });
+  });
+});
+
+const globalLoginTemplate = {
+  id: 7,
+  engine: 'email',
+  type: 'login email',
+  label: 'Inloggen via e-mail',
+  subject: 'Je inloglink',
+  body: '<mjml>global login</mjml>',
+  content: { heading: 'Inloggen' },
+  createdAt: 'nope',
+};
+
+describe('buildLoginTemplateRow', () => {
+  it('copies only the columns a project row owns', () => {
+    expect(buildLoginTemplateRow(globalLoginTemplate, 5)).toEqual({
+      projectId: 5,
+      type: 'login email',
+      engine: 'email',
+      label: 'Inloggen via e-mail',
+      subject: 'Je inloglink',
+      body: '<mjml>global login</mjml>',
+      content: { heading: 'Inloggen' },
+    });
+  });
+
+  it('does not carry over the id or the timestamps', () => {
+    const row = buildLoginTemplateRow(globalLoginTemplate, 5);
+    expect(row.id).toBeUndefined();
+    expect(row.createdAt).toBeUndefined();
+  });
+
+  it('returns null without a global template or without a project', () => {
+    expect(buildLoginTemplateRow(null, 5)).toBe(null);
+    expect(buildLoginTemplateRow(globalLoginTemplate, undefined)).toBe(null);
+  });
+
+  // An empty body would make NotificationMessage throw at send time instead of
+  // falling back, so there is nothing worth copying.
+  it('returns null when the global template has no body', () => {
+    expect(buildLoginTemplateRow({ ...globalLoginTemplate, body: '' }, 5)).toBe(
+      null
+    );
+  });
+
+  it('falls back to the type as label', () => {
+    const row = buildLoginTemplateRow(
+      { ...globalLoginTemplate, label: undefined },
+      5
+    );
+    expect(row.label).toBe('login email');
+  });
+});
+
+function fakeDb({ globalTemplate = null, projectTemplate = null } = {}) {
+  const created = [];
+  return {
+    created,
+    SiteNotificationTemplate: {
+      findOne: async () => globalTemplate,
+    },
+    NotificationTemplate: {
+      findOne: async () => projectTemplate,
+      create: async (row) => {
+        created.push(row);
+        return row;
+      },
+    },
+  };
+}
+
+describe('copyGlobalLoginTemplate', () => {
+  it('creates the project row from the global template', async () => {
+    const db = fakeDb({ globalTemplate: globalLoginTemplate });
+    await copyGlobalLoginTemplate(5, { db });
+    expect(db.created).toEqual([
+      {
+        projectId: 5,
+        type: 'login email',
+        engine: 'email',
+        label: 'Inloggen via e-mail',
+        subject: 'Je inloglink',
+        body: '<mjml>global login</mjml>',
+        content: { heading: 'Inloggen' },
+      },
+    ]);
+  });
+
+  it('does not even query without a project id', async () => {
+    const db = fakeDb({ globalTemplate: globalLoginTemplate });
+    let queried = false;
+    db.SiteNotificationTemplate.findOne = async () => {
+      queried = true;
+      return globalLoginTemplate;
+    };
+
+    expect(await copyGlobalLoginTemplate(undefined, { db })).toBe(null);
+    expect(queried).toBe(false);
+  });
+
+  it('does nothing when there is no global login template', async () => {
+    const db = fakeDb();
+    expect(await copyGlobalLoginTemplate(5, { db })).toBe(null);
+    expect(db.created).toEqual([]);
+  });
+
+  // A duplicated project brings the source's templates along. Overwriting one would be
+  // exactly the thing this feature promises never to do.
+  it('never overwrites a template the project already has', async () => {
+    const db = fakeDb({
+      globalTemplate: globalLoginTemplate,
+      projectTemplate: { id: 1, type: 'login email', body: '<mjml>own</mjml>' },
+    });
+    expect(await copyGlobalLoginTemplate(5, { db })).toBe(null);
+    expect(db.created).toEqual([]);
   });
 });

@@ -49,6 +49,7 @@ router
   .post(ctrl.createProjectRecord)
   .post(ctrl.syncAuthProvidersAfterCreate)
   .post(ctrl.createDuplicatedData)
+  .post(ctrl.copyGlobalLoginNotificationTemplate)
   .post(ctrl.addCurrentUserAsAdmin)
   .post(ctrl.publishNewProjectEvent)
   .post(auth.useReqUser)

@@ -55,4 +55,57 @@ async function getGlobalProjectDefaults() {
   return buildProjectDefaults(siteConfig);
 }
 
-module.exports = { getGlobalProjectDefaults, buildProjectDefaults };
+// The one mail that cannot be inherited at send time. The auth server sends the login
+// mail itself from its client config, and NotificationTemplate's updateAuthClient hook is
+// what fills that config - a global row has no project to push to. So a new project gets
+// the global login mail as its own row, after which the existing hook does the rest.
+// The other types are resolved at send time, see notifications/resolve-template.js.
+const LOGIN_TEMPLATE_TYPE = 'login email';
+
+// Columns copied onto the project row. `type` is added separately, `projectId` by the
+// caller, and id/timestamps must not carry over.
+const COPIED_TEMPLATE_KEYS = ['engine', 'label', 'subject', 'body', 'content'];
+
+// Pure half: what the project row looks like, or null when there is nothing to copy.
+function buildLoginTemplateRow(globalTemplate, projectId) {
+  if (!globalTemplate || !projectId) return null;
+
+  const row = { projectId, type: LOGIN_TEMPLATE_TYPE };
+  COPIED_TEMPLATE_KEYS.forEach((key) => {
+    if (globalTemplate[key] !== undefined) row[key] = globalTemplate[key];
+  });
+  if (!row.body) return null;
+  if (!row.label) row.label = LOGIN_TEMPLATE_TYPE;
+  return row;
+}
+
+// Copies the global login mail onto a freshly created project. Skips silently when there
+// is no global template, or when the project already has one: a duplicated project brings
+// its source's templates along, and those must never be overwritten.
+async function copyGlobalLoginTemplate(projectId, options = {}) {
+  if (!projectId) return null;
+
+  // Required lazily for the same reason as above: no database connection at import time.
+  const db = options.db || require('../db');
+
+  const globalTemplate = await db.SiteNotificationTemplate.findOne({
+    where: { type: LOGIN_TEMPLATE_TYPE },
+  });
+  const row = buildLoginTemplateRow(globalTemplate, projectId);
+  if (!row) return null;
+
+  const existing = await db.NotificationTemplate.findOne({
+    where: { projectId, type: LOGIN_TEMPLATE_TYPE },
+  });
+  if (existing) return null;
+
+  return await db.NotificationTemplate.create(row);
+}
+
+module.exports = {
+  LOGIN_TEMPLATE_TYPE,
+  buildProjectDefaults,
+  buildLoginTemplateRow,
+  copyGlobalLoginTemplate,
+  getGlobalProjectDefaults,
+};
