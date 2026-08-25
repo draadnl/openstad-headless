@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const merge = require('merge');
 const db = require('../db');
 const authSettings = require('../util/auth-settings');
+const { parseAuthHeader } = require('./parse-auth-header');
 
 let adapters = {};
 
@@ -37,7 +38,12 @@ module.exports = async function getUser(req, res, next) {
       }
     }
     let { userId, isFixed, authProvider } = parseAuthHeader(
-      req.headers['authorization']
+      req.headers['authorization'],
+      {
+        jwtSecret: config && config.auth && config.auth['jwtSecret'],
+        fixedAuthTokens:
+          config && config.auth && config.auth['fixedAuthTokens'],
+      }
     );
     let authConfig = await authSettings.config({
       project: req.project,
@@ -80,57 +86,6 @@ module.exports = async function getUser(req, res, next) {
 function nextWithEmptyUser(req, res, next) {
   req.user = { role: 'anonymous', id: null };
   return next();
-}
-
-function parseAuthHeader(authorizationHeader) {
-  // todo: // config moet authConfig zijn
-  const fixedAuthTokens =
-    config && config.auth && config.auth['fixedAuthTokens'];
-
-  if (authorizationHeader.match(/^bearer /i)) {
-    const jwt = parseJwt(authorizationHeader);
-    return jwt && jwt.userId
-      ? { userId: jwt.userId, authProvider: jwt.authProvider }
-      : {};
-  }
-
-  if (fixedAuthTokens) {
-    const token = fixedAuthTokens.find(
-      (token) => token.token === authorizationHeader
-    );
-    if (token) {
-      return {
-        userId: token.userId,
-        isFixed: true,
-        authProvider: token.authProvider,
-      };
-    }
-  }
-
-  return {};
-}
-
-/**
- * get token from authorization header and parse jwt.
- * @param authorizationHeader
- * @returns {*}
- */
-function parseJwt(authorizationHeader) {
-  let token = authorizationHeader.replace(/^bearer /i, '');
-  try {
-    return jwt.verify(token, config.auth['jwtSecret']);
-  } catch (err) {
-    if (err.name === 'TokenExpiredError') {
-      console.log(
-        `[${new Date().toISOString()}][auth-middleware] JWT expired: expiredAt=${err.expiredAt?.toISOString?.() || 'unknown'}`
-      );
-    } else {
-      console.log(
-        `[${new Date().toISOString()}][auth-middleware] JWT verification failed: ${err.name}: ${err.message}`
-      );
-    }
-    throw err;
-  }
 }
 
 /**
