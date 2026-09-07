@@ -21,6 +21,7 @@ npm run test:unit:api        # apps/api-server
 npm run test:unit:auth       # apps/auth-server
 npm run test:unit:cms        # apps/cms-server
 npm run test:unit:image      # apps/image-server
+npm run test:unit:mcp        # apps/mcp-server
 npm run test:unit:watch      # watch mode
 npm run test:unit:coverage   # with coverage
 ```

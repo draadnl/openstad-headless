@@ -292,6 +292,30 @@ services:
       - openstad-image-server-documents:/opt/openstad-headless/apps/image-server/documents
       - openstad-image-server-init:/opt/openstad-headless/apps/image-server/init
 
+  openstad-mcp-server:
+    build:
+      target: ${BUILD_TARGET:-development}
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - APP=mcp-server
+        - PORT=${MCP_PORT:-3900}
+        - BUILD_ENV=${BUILD_ENV:-production}
+    image: ${REGISTRY:-docker.io}/${REPOSITORY:-openstad/headless-mcp-server}:${RELEASE_VERSION:-latest}
+    container_name: openstad-mcp-server
+    restart: unless-stopped
+    environment:
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=${MCP_PORT:-3900}
+      - MCP_REPORTING_API_BASE_URL=http://openstad-api-server:${API_PORT}
+      - MCP_ALLOWED_HOSTS=localhost,127.0.0.1
+      - NODE_ENV=development
+    ports:
+      - '${MCP_PORT:-3900}:${MCP_PORT:-3900}'
+    volumes:
+      - ./apps/mcp-server:/opt/openstad-headless/apps/mcp-server
+      - openstad-mcp-server-node_modules:/opt/openstad-headless/apps/mcp-server/node_modules
+
   openstad-admin-server:
     build:
       target: ${BUILD_TARGET:-development}
@@ -400,6 +424,7 @@ volumes:
   openstad-image-server-images: {}
   openstad-image-server-documents: {}
   openstad-image-server-init: {}
+  openstad-mcp-server-node_modules: {}
   openstad-admin-server-node_modules: {}
   openstad-cms-server-node_modules: {}
   openstad-cms-server-init: {}

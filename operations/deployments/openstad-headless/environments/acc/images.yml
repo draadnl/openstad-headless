@@ -13,3 +13,6 @@ image:
 cms:
   deploymentContainer:
     image: ghcr.io/openstad/cms-server:develop-92adaf9
+mcp:
+  deploymentContainer:
+    image: ghcr.io/openstad/mcp-server:develop-92adaf9
