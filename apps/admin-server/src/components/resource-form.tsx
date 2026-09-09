@@ -15,6 +15,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { useRegisterSave } from '@/components/ui/save-controller';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Heading } from '@/components/ui/typography';
@@ -159,9 +160,11 @@ type FormType = z.infer<typeof baseSchema>;
 
 type Props = {
   onFormSubmit: (body: FormType) => Promise<any>;
+  /** Register with the global header save bar instead of rendering a bottom submit button. */
+  useGlobalSave?: boolean;
 };
 
-export default function ResourceForm({ onFormSubmit }: Props) {
+export default function ResourceForm({ onFormSubmit, useGlobalSave }: Props) {
   const router = useRouter();
   const { project, id } = router.query;
   const { data: projectData } = useProject();
@@ -327,24 +330,33 @@ export default function ResourceForm({ onFormSubmit }: Props) {
     defaultValues: defaults(),
   });
 
-  function onSubmit(values: FormType) {
-    // Capture the location-independent flag from the checkbox before the
-    // CodeEditor state potentially overwrites the whole extraData object below.
-    const locationIndependent = !!values.extraData?.locationIndependent;
+  const buildSubmitValues = useCallback(
+    (values: FormType) => {
+      // Capture the location-independent flag from the checkbox before the
+      // CodeEditor state potentially overwrites the whole extraData object below.
+      const locationIndependent = !!values.extraData?.locationIndependent;
 
-    // Add extraData if its valid JSON
-    try {
-      if (extraData !== values.extraData) {
-        values.extraData = JSON.parse(extraData);
+      // Add extraData if its valid JSON
+      try {
+        if (extraData !== values.extraData) {
+          values.extraData = JSON.parse(extraData);
+        }
+      } catch (e) {}
+
+      // Re-apply the location-independent flag so it survives the JSON overwrite.
+      if (values.extraData && typeof values.extraData === 'object') {
+        values.extraData.locationIndependent = locationIndependent;
       }
-    } catch (e) {}
 
-    // Re-apply the location-independent flag so it survives the JSON overwrite.
-    if (values.extraData && typeof values.extraData === 'object') {
-      values.extraData.locationIndependent = locationIndependent;
-    }
+      return values;
+    },
+    [extraData]
+  );
 
-    onFormSubmit(values)
+  function onSubmit(values: FormType) {
+    const finalValues = buildSubmitValues(values);
+
+    onFormSubmit(finalValues)
       .then(() => {
         toast.success(`Plan successvol ${id ? 'aangepast' : 'aangemaakt'}`);
         router.push(`/projects/${project}/resources`);
@@ -357,6 +369,24 @@ export default function ResourceForm({ onFormSubmit }: Props) {
         toast.error(`Plan kon niet ${id ? 'aangepast' : 'aangemaakt'} worden`);
       });
   }
+
+  const save = useCallback(async () => {
+    const valid = await form.trigger();
+    if (!valid) {
+      throw new Error('Controleer de gemarkeerde velden.');
+    }
+    const finalValues = buildSubmitValues(form.getValues());
+    await onFormSubmit(finalValues);
+
+    // SWR reload
+    const url = `/api/openstad/api/project/${project}/resource/${id}`;
+    mutate(url);
+  }, [form, buildSubmitValues, onFormSubmit, project, id, mutate]);
+
+  useRegisterSave({
+    isDirty: !!useGlobalSave && form.formState.isDirty,
+    save,
+  });
 
   useEffect(() => {
     if (existingData) {
@@ -481,7 +511,11 @@ export default function ResourceForm({ onFormSubmit }: Props) {
         <Heading size="xl">{id ? 'Aanpassen' : 'Toevoegen'}</Heading>
         <Separator className="my-4" />
         <form
-          onSubmit={form.handleSubmit(onSubmit)}
+          onSubmit={
+            useGlobalSave
+              ? (e) => e.preventDefault()
+              : form.handleSubmit(onSubmit)
+          }
           className="lg:w-3/3 grid grid-cols-2 lg:auto-rows-fit gap-10">
           <FormField
             control={form.control}
@@ -1152,9 +1186,11 @@ export default function ResourceForm({ onFormSubmit }: Props) {
               )}
             />
           </div>
-          <Button className="w-fit col-span-full" type="submit">
-            Opslaan
-          </Button>
+          {!useGlobalSave && (
+            <Button className="w-fit col-span-full" type="submit">
+              Opslaan
+            </Button>
+          )}
         </form>
       </Form>
     </div>

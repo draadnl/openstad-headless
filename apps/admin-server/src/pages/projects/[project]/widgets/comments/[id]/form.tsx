@@ -43,7 +43,7 @@ export default function ArgumentsForm(
   const { onFieldChange } = useFieldDebounce(props.onFieldChanged);
   useSyncDraftForm(form, props.onFieldChanged, {
     schema: formSchema,
-    label: 'Formulier',
+    label: props.customTitle || 'Formulier',
   });
 
   return (

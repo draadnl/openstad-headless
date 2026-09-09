@@ -9,7 +9,10 @@ export default function useComment(projectId?: string, id?: string) {
 
   const commentSwr = useSWR(projectNumber && useId ? url : null);
 
-  async function updateComment(description: string, label: string) {
+  async function updateComment(
+    description: string,
+    label: string
+  ): Promise<any | null> {
     const res = await fetch(url, {
       method: 'PUT',
       headers: {
@@ -17,6 +20,10 @@ export default function useComment(projectId?: string, id?: string) {
       },
       body: JSON.stringify({ id: useId, description, label }),
     });
+
+    if (!res.ok) {
+      return null;
+    }
 
     return await res.json();
   }

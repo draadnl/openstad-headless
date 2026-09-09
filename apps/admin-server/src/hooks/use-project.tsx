@@ -107,7 +107,7 @@ export function useProject(scopes?: Array<string>) {
     return data;
   }
 
-  async function updateProjectEmails(emailConfig: any) {
+  async function updateProjectEmails(emailConfig: any): Promise<any | null> {
     const res = await fetch(`/api/openstad/api/project/${projectNumber}`, {
       method: 'PUT',
       headers: {
@@ -115,11 +115,16 @@ export function useProject(scopes?: Array<string>) {
       },
       body: JSON.stringify({ emailConfig }),
     });
+
+    if (!res.ok) {
+      return null;
+    }
+
     const data = await res.json();
 
     projectSwr.mutate(data);
 
-    return await data;
+    return data;
   }
 
   async function anonymizeUsersOfProject() {

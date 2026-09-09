@@ -8,7 +8,11 @@ export default function useArea(layerId?: string) {
 
   const datalayerSwr = useSWR(layerNumber ? url : null);
 
-  async function updateDatalayer(name: string, layer: string, icon: any) {
+  async function updateDatalayer(
+    name: string,
+    layer: string,
+    icon: any
+  ): Promise<any | null> {
     const res = await fetch(url, {
       method: 'PUT',
       headers: {
@@ -20,6 +24,10 @@ export default function useArea(layerId?: string) {
         icon: icon,
       }),
     });
+
+    if (!res.ok) {
+      return null;
+    }
 
     return await res.json();
   }

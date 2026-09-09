@@ -14,7 +14,7 @@ export default function useArea(areaId?: string) {
     hidePolygon = false,
     tagIds: number[] = [],
     tagIdsOutside: number[] = []
-  ) {
+  ): Promise<any | null> {
     const res = await fetch(url, {
       method: 'PUT',
       headers: {
@@ -28,6 +28,10 @@ export default function useArea(areaId?: string) {
         tagIdsOutside,
       }),
     });
+
+    if (!res.ok) {
+      return null;
+    }
 
     return await res.json();
   }
