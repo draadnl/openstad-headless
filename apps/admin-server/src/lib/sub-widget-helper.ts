@@ -10,7 +10,11 @@ type ExtractConfigParams<
   subWidgetKey: keyof ParentWidgetProps;
   previewConfig: ParentWidgetProps | null;
   updateConfig: (config: ParentWidgetProps) => void;
-  updatePreview: (config: ParentWidgetProps) => void;
+  updatePreview: (
+    config:
+      | ParentWidgetProps
+      | ((prev: ParentWidgetProps | undefined) => ParentWidgetProps)
+  ) => void;
   extraChildConfig?: Partial<ChildWidgetProps>;
   widgetName?: string;
 };
@@ -43,15 +47,16 @@ export function extractConfig<
         },
       }),
     onFieldChanged: (key: string, value: any) => {
-      if (previewConfig) {
-        updatePreview({
-          ...previewConfig,
+      updatePreview((prev) => {
+        const base = prev ?? previewConfig;
+        return {
+          ...base,
           [subWidgetKey]: {
-            ...previewConfig[subWidgetKey],
+            ...base[subWidgetKey],
             [key]: value,
           },
-        });
-      }
+        };
+      });
     },
   };
   return extractedConfig;

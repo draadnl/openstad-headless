@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { PageLayout } from '@/components/ui/page-layout';
+import { useRegisterSave } from '@/components/ui/save-controller';
 import {
   Select,
   SelectContent,
@@ -28,7 +29,6 @@ import { useRouter } from 'next/router';
 import * as React from 'react';
 import { useCallback, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import toast from 'react-hot-toast';
 import * as z from 'zod';
 
 const formSchema = z.object({
@@ -77,7 +77,16 @@ export default function ProjectStatusEdit() {
     defaultValues: defaults(),
   });
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  useEffect(() => {
+    form.reset(defaults());
+  }, [form, defaults]);
+
+  const save = useCallback(async () => {
+    const valid = await form.trigger();
+    if (!valid) {
+      throw new Error('Controleer de gemarkeerde velden.');
+    }
+    const values = formSchema.parse(form.getValues());
     const status = await updateStatus(
       values.name,
       values.seqnr,
@@ -93,16 +102,12 @@ export default function ProjectStatusEdit() {
         canLike: values.canLike,
       }
     );
-    if (status) {
-      toast.success('Status aangepast!');
-    } else {
-      toast.error('Er is helaas iets mis gegaan.');
+    if (!status) {
+      throw new Error('Er is helaas iets mis gegaan.');
     }
-  }
+  }, [form, updateStatus]);
 
-  useEffect(() => {
-    form.reset(defaults());
-  }, [form, defaults]);
+  useRegisterSave({ isDirty: form.formState.isDirty, save });
 
   const colors = [
     { value: 'FFFFFF', label: 'Wit' },
@@ -158,9 +163,7 @@ export default function ProjectStatusEdit() {
                 <Form {...form}>
                   <Heading size="xl">Status Aanpassen</Heading>
                   <Separator className="my-4" />
-                  <form
-                    onSubmit={form.handleSubmit(onSubmit)}
-                    className="lg:w-1/2 grid grid-cols-1 gap-4">
+                  <div className="lg:w-1/2 grid grid-cols-1 gap-4">
                     <FormField
                       control={form.control}
                       name="name"
@@ -201,10 +204,7 @@ export default function ProjectStatusEdit() {
                         </FormItem>
                       )}
                     />
-                    <Button className="w-fit col-span-full" type="submit">
-                      Opslaan
-                    </Button>
-                  </form>
+                  </div>
                 </Form>
               </div>
             </TabsContent>
@@ -213,9 +213,7 @@ export default function ProjectStatusEdit() {
                 <Form {...form}>
                   <Heading size="xl">Status weergave</Heading>
                   <Separator className="my-4" />
-                  <form
-                    onSubmit={form.handleSubmit(onSubmit)}
-                    className="lg:w-1/2 grid grid-cols-1 gap-4">
+                  <div className="lg:w-1/2 grid grid-cols-1 gap-4">
                     <FormField
                       control={form.control}
                       name="backgroundColor"
@@ -366,10 +364,7 @@ export default function ProjectStatusEdit() {
                         </FormItem>
                       )}
                     />
-                    <Button className="w-fit col-span-full" type="submit">
-                      Opslaan
-                    </Button>
-                  </form>
+                  </div>
                 </Form>
               </div>
             </TabsContent>
@@ -382,9 +377,7 @@ export default function ProjectStatusEdit() {
                     Op basis van de statuses van een resource kunnen functies
                     aan en uit staan
                   </p>
-                  <form
-                    onSubmit={form.handleSubmit(onSubmit)}
-                    className="lg:w-1/2 grid grid-cols-1 gap-4">
+                  <div className="lg:w-1/2 grid grid-cols-1 gap-4">
                     <FormField
                       control={form.control}
                       name="editableByUser"
@@ -469,10 +462,7 @@ export default function ProjectStatusEdit() {
                         </FormItem>
                       )}
                     />
-                    <Button className="w-fit col-span-full" type="submit">
-                      Opslaan
-                    </Button>
-                  </form>
+                  </div>
                 </Form>
               </div>
             </TabsContent>

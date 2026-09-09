@@ -30,7 +30,7 @@ export default function useTags(projectId?: string, id?: string) {
     newSubmitAddress: string | undefined,
     defaultResourceImage: string | undefined,
     documentMapIconColor: string | undefined
-  ) {
+  ): Promise<any | null> {
     const res = await fetch(url, {
       method: 'PUT',
       headers: {
@@ -54,6 +54,10 @@ export default function useTags(projectId?: string, id?: string) {
         documentMapIconColor,
       }),
     });
+
+    if (!res.ok) {
+      return null;
+    }
 
     return await res.json();
   }

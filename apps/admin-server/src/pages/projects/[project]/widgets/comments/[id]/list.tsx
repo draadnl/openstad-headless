@@ -55,7 +55,7 @@ export default function ArgumentsList({
   const { onFieldChange } = useFieldDebounce(props.onFieldChanged);
   useSyncDraftForm(form, props.onFieldChanged, {
     schema: finalSchema,
-    label: 'Titel',
+    label: props.customTitle || 'Titel',
   });
 
   function onSubmit(values: FinalSchemaInfer) {
