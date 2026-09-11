@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { PageLayout } from '@/components/ui/page-layout';
-import { useRegisterSave } from '@/components/ui/save-controller';
+import { useRegisterFormSave } from '@/components/ui/save-controller';
 import {
   Select,
   SelectContent,
@@ -19,10 +19,11 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Heading } from '@/components/ui/typography';
+import { useSyncFormDefaults } from '@/hooks/useSyncFormDefaults';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/router';
 import * as React from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import * as z from 'zod';
@@ -72,27 +73,24 @@ export default function ProjectSettingsCertificates() {
   const { data, isLoading, updateProject, mutate } = useProject();
   const [retryLoading, setRetryLoading] = useState(false);
 
+  const defaults = useCallback(() => {
+    const certs = data?.config?.certificates || {};
+    return {
+      certificateMethod:
+        certs.certificateMethod ||
+        data?.config?.certificateMethod ||
+        'cert-manager',
+      externalCertSlug:
+        certs.externalCertSlug || data?.config?.externalCertSlug || '',
+    };
+  }, [data?.config]);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      certificateMethod: 'cert-manager',
-      externalCertSlug: '',
-    },
+    defaultValues: defaults(),
   });
 
-  useEffect(() => {
-    if (data?.config) {
-      const certs = data.config.certificates || {};
-      form.reset({
-        certificateMethod:
-          certs.certificateMethod ||
-          data.config.certificateMethod ||
-          'cert-manager',
-        externalCertSlug:
-          certs.externalCertSlug || data.config.externalCertSlug || '',
-      });
-    }
-  }, [data, form]);
+  useSyncFormDefaults(form, defaults, data?.config);
 
   const save = useCallback(async () => {
     const valid = await form.trigger();
@@ -112,7 +110,7 @@ export default function ProjectSettingsCertificates() {
     mutate();
   }, [form, updateProject, mutate]);
 
-  useRegisterSave({ isDirty: form.formState.isDirty, save });
+  useRegisterFormSave(form, save);
 
   async function handleRetry() {
     setRetryLoading(true);

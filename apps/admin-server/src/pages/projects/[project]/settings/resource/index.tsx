@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { PageLayout } from '@/components/ui/page-layout';
-import { useRegisterSave } from '@/components/ui/save-controller';
+import { useRegisterFormSave } from '@/components/ui/save-controller';
 import {
   Select,
   SelectContent,
@@ -21,6 +21,7 @@ import { Separator } from '@/components/ui/separator';
 import { Heading } from '@/components/ui/typography';
 import useStatuses from '@/hooks/use-statuses';
 import useTags from '@/hooks/use-tags';
+import { useSyncFormDefaults } from '@/hooks/useSyncFormDefaults';
 import { YesNoSelect } from '@/lib/form-widget-helpers';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/router';
@@ -122,9 +123,7 @@ export default function ProjectSettingsResource() {
     defaultValues: defaults(),
   });
 
-  React.useEffect(() => {
-    form.reset(defaults());
-  }, [form, defaults]);
+  useSyncFormDefaults(form, defaults, data);
 
   const save = React.useCallback(async () => {
     const valid = await form.trigger();
@@ -157,7 +156,7 @@ export default function ProjectSettingsResource() {
     }
   }, [form, updateProject]);
 
-  useRegisterSave({ isDirty: form.formState.isDirty, save });
+  useRegisterFormSave(form, save);
 
   return (
     <div>

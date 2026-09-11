@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Heading } from '@/components/ui/typography';
 import useNotificationTemplate from '@/hooks/use-notification-template';
+import { useSyncFormDefaults } from '@/hooks/useSyncFormDefaults';
 import { applyFilters } from '@/lib/nunjucks-filters';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/router';
@@ -467,7 +468,8 @@ export function NotificationForm({
       subject: subject || '',
       body: defaultValueBody,
     }),
-    [engine, label, subject, body]
+    // `type` feeds `defaultValueBody`, so it belongs here as well.
+    [engine, label, subject, type, defaultValueBody]
   );
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -478,9 +480,10 @@ export function NotificationForm({
   const { watch } = form;
   const fieldValue = watch('body'); // Assuming 'engine' is the name of the field you're interested in
 
-  useEffect(() => {
-    form.reset(defaults());
-  }, [form, defaults]);
+  // Guarded on `id`: only an existing template gets its values from SWR and can
+  // therefore land mid-edit. A create instance never receives them, so its form
+  // keeps the `defaultValues` it mounted with and typing in it is never reset.
+  useSyncFormDefaults(form, defaults, id);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (label && subject && body !== undefined) {

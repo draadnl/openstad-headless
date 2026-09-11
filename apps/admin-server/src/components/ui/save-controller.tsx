@@ -1,4 +1,6 @@
 import useUnsavedChanges from '@/hooks/use-unsaved-changes';
+import cloneDeep from 'lodash/cloneDeep';
+import isEqual from 'lodash/isEqual';
 import {
   ReactNode,
   createContext,
@@ -25,6 +27,13 @@ export type SaveRegistration = {
   isDirty: boolean;
   /** Persist the changes. Must throw / reject when the save fails. */
   save: () => Promise<void>;
+  /**
+   * `false` keeps a component off the bar. For a form that is shared between an
+   * edit page and a create page, where only the edit page is migrated: the
+   * create page keeps its own button, so registering there would add a second,
+   * permanently disabled save control next to the working one.
+   */
+  enabled?: boolean;
 };
 
 type SaveControllerValue = {
@@ -104,11 +113,12 @@ export function SaveControllerProvider({ children }: { children: ReactNode }) {
       .save()
       .then(() => {
         if (isStale()) return;
-        if (registrationRef.current?.isDirty) {
-          setIsDirty(true);
-          setPhase('idle');
-          return;
-        }
+        // Dirty state is the registered page's to report, not this callback's.
+        // Every consumer clears it after a successful save and re-registers,
+        // which lands here as `setIsDirty(false)` through `register`. Forcing
+        // it false from here would also hide a field the user typed while the
+        // request was in flight: that edit was never sent, so the bar has to
+        // keep offering to save it.
         setPhase('success');
         clearSuccessTimer();
         successTimer.current = setTimeout(() => {
@@ -202,12 +212,72 @@ export function useSaveController(): SaveControllerValue {
  */
 export function useRegisterSave(registration: SaveRegistration) {
   const { register } = useSaveController();
+  const enabled = registration.enabled !== false;
 
   useEffect(() => {
+    if (!enabled) return;
     register(registration);
-  }, [register, registration.isDirty, registration.save]);
+  }, [register, enabled, registration.isDirty, registration.save]);
 
   useEffect(() => {
+    if (!enabled) return;
+    // Only a component that registered may clear the registration: there is one
+    // slot, so an unmounting component that never registered would otherwise
+    // wipe the registration of the page it shares the route with.
     return () => register(null);
-  }, [register]);
+  }, [register, enabled]);
+}
+
+/**
+ * Re-baseline a form on the values that were just persisted.
+ *
+ * `sent` must be a deep copy taken *before* the request: `getValues()` hands
+ * out the live nested objects, so a keystroke during the request would mutate
+ * the snapshot too and the comparison below could never see a difference.
+ *
+ * Anything typed while the request was in flight was not part of it. Adopting
+ * the current values as the saved baseline would mark that edit as saved and
+ * silently drop it, so those values are kept as a live, still-dirty edit.
+ */
+export function rebaselineAfterSave(
+  form: {
+    getValues: () => any;
+    reset: (values?: any, options?: any) => void;
+  },
+  sent: any
+) {
+  const editedMeanwhile = !isEqual(form.getValues(), sent);
+  form.reset(
+    sent,
+    editedMeanwhile ? { keepValues: true, keepDirty: true } : undefined
+  );
+}
+
+/**
+ * Register a react-hook-form page with the global save bar.
+ *
+ * On top of `useRegisterSave` this clears the form's dirty baseline after a
+ * successful save, so the bar can switch to its "saved" confirmation instead
+ * of keeping the "unsaved changes" warning on screen.
+ */
+export function useRegisterFormSave(
+  form: {
+    formState: { isDirty: boolean };
+    getValues: () => any;
+    reset: (values?: any, options?: any) => void;
+  },
+  save: () => Promise<void>,
+  options?: { enabled?: boolean }
+) {
+  const saveAndClearDirty = useCallback(async () => {
+    const sent = cloneDeep(form.getValues());
+    await save();
+    rebaselineAfterSave(form, sent);
+  }, [form, save]);
+
+  useRegisterSave({
+    enabled: options?.enabled,
+    isDirty: form.formState.isDirty,
+    save: saveAndClearDirty,
+  });
 }

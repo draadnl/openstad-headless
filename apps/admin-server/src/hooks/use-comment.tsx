@@ -1,3 +1,4 @@
+import { throwApiError } from '@/lib/api-error';
 import { validateProjectNumber } from '@/lib/validateProjectNumber';
 import useSWR from 'swr';
 
@@ -22,7 +23,7 @@ export default function useComment(projectId?: string, id?: string) {
     });
 
     if (!res.ok) {
-      return null;
+      await throwApiError(res, 'De reactie kon niet worden opgeslagen.');
     }
 
     return await res.json();

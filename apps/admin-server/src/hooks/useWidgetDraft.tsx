@@ -124,7 +124,12 @@ export function useSyncDraftForm<TFieldValues extends Record<string, any>>(
       return { ok: false, label, message: firstMessage || 'ongeldige waarde.' };
     };
     if (schemaRef.current) {
-      draftValidators.set(key, () => validateValues(form.getValues()));
+      // Only validate a tab the user actually touched. Stored config that
+      // predates a schema change would otherwise block the whole widget save
+      // from every tab, just because this one was mounted once.
+      draftValidators.set(key, () =>
+        wasEditedRef.current ? validateValues(form.getValues()) : { ok: true }
+      );
     }
 
     return () => {

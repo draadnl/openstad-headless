@@ -1,15 +1,16 @@
 import { CheckboxList } from '@/components/checkbox-list';
 import { Form } from '@/components/ui/form';
 import { PageLayout } from '@/components/ui/page-layout';
-import { useRegisterSave } from '@/components/ui/save-controller';
+import { useRegisterFormSave } from '@/components/ui/save-controller';
 import { Separator } from '@/components/ui/separator';
 import { Spacer } from '@/components/ui/spacer';
 import { Heading } from '@/components/ui/typography';
 import { useProject } from '@/hooks/use-project';
 import useTags from '@/hooks/use-tags';
+import { useSyncFormDefaults } from '@/hooks/useSyncFormDefaults';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/router';
-import React, { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 
@@ -33,9 +34,7 @@ export default function ProjectSettingsTags() {
     defaultValues: defaults(),
   });
 
-  useEffect(() => {
-    form.reset(defaults());
-  }, [form, defaults]);
+  useSyncFormDefaults(form, defaults, data);
 
   const { data: loadedTags } = useTags(project as string);
   const tags = (loadedTags || []) as Array<{
@@ -60,7 +59,7 @@ export default function ProjectSettingsTags() {
     }
   }, [form, updateProject]);
 
-  useRegisterSave({ isDirty: form.formState.isDirty, save });
+  useRegisterFormSave(form, save);
 
   return (
     <div>

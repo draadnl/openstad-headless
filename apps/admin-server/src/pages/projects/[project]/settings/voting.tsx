@@ -9,7 +9,7 @@ import {
 import InfoDialog from '@/components/ui/info-hover';
 import { Input } from '@/components/ui/input';
 import { PageLayout } from '@/components/ui/page-layout';
-import { useRegisterSave } from '@/components/ui/save-controller';
+import { useRegisterFormSave } from '@/components/ui/save-controller';
 import {
   Select,
   SelectContent,
@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Heading } from '@/components/ui/typography';
+import { useSyncFormDefaults } from '@/hooks/useSyncFormDefaults';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as Switch from '@radix-ui/react-switch';
 import { useRouter } from 'next/router';
@@ -125,9 +126,7 @@ export default function ProjectSettingsVoting() {
     defaultValues: defaults(),
   });
 
-  useEffect(() => {
-    form.reset(defaults());
-  }, [form, defaults]);
+  useSyncFormDefaults(form, defaults, data);
 
   useEffect(() => {
     setFieldValue(data?.config?.[category]?.voteType);
@@ -157,7 +156,7 @@ export default function ProjectSettingsVoting() {
     }
   }, [form, updateProject]);
 
-  useRegisterSave({ isDirty: form.formState.isDirty, save });
+  useRegisterFormSave(form, save);
 
   return (
     <div>

@@ -10,13 +10,18 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { PageLayout } from '@/components/ui/page-layout';
-import { useRegisterSave } from '@/components/ui/save-controller';
+import {
+  rebaselineAfterSave,
+  useRegisterSave,
+} from '@/components/ui/save-controller';
 import { Separator } from '@/components/ui/separator';
 import { Spacer } from '@/components/ui/spacer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Heading } from '@/components/ui/typography';
+import { useSyncFormDefaults } from '@/hooks/useSyncFormDefaults';
 import { zodResolver } from '@hookform/resolvers/zod';
+import cloneDeep from 'lodash/cloneDeep';
 import { Copy, Info } from 'lucide-react';
 import { useRouter } from 'next/router';
 import * as React from 'react';
@@ -179,13 +184,22 @@ export default function ProjectAuthenticationRequiredFields() {
     defaultValues: anonymousDefaults(),
   });
 
-  useEffect(() => {
-    userForm.reset(userDefaults());
-  }, [userForm, userDefaults]);
+  // Guarded on the provider's `config` subtree, not on `data` or on the
+  // provider itself: a save strips `provider.<x>.config` from the body
+  // (api-server project.js) and answers with the raw project, so both of those
+  // stay truthy afterwards while the values these forms read are gone. Only the
+  // enriched GET carries `config`, so it is what tells the two apart.
+  useSyncFormDefaults(
+    userForm,
+    userDefaults,
+    data?.config?.auth?.provider?.openstad?.config
+  );
 
-  useEffect(() => {
-    anonymousForm.reset(anonymousDefaults());
-  }, [anonymousForm, anonymousDefaults]);
+  useSyncFormDefaults(
+    anonymousForm,
+    anonymousDefaults,
+    data?.config?.auth?.provider?.anonymous?.config
+  );
 
   const [activeTab, setActiveTab] = useState('users');
 
@@ -200,6 +214,7 @@ export default function ProjectAuthenticationRequiredFields() {
       );
     }
     const values = formSchema.parse(userForm.getValues());
+    const sent = cloneDeep(userForm.getValues());
     const updatedConfig = {
       auth: {
         provider: {
@@ -225,6 +240,8 @@ export default function ProjectAuthenticationRequiredFields() {
     if (!result || !doubleSave) {
       throw new Error('Er is helaas iets mis gegaan.');
     }
+
+    rebaselineAfterSave(userForm, sent);
   }, [userForm, updateProject]);
 
   const saveAnonymous = useCallback(async () => {
@@ -238,6 +255,7 @@ export default function ProjectAuthenticationRequiredFields() {
       );
     }
     const values = formSchema.parse(anonymousForm.getValues());
+    const sent = cloneDeep(anonymousForm.getValues());
     const updatedConfig = {
       auth: {
         provider: {
@@ -263,6 +281,8 @@ export default function ProjectAuthenticationRequiredFields() {
     if (!result || !doubleSave) {
       throw new Error('Er is helaas iets mis gegaan.');
     }
+
+    rebaselineAfterSave(anonymousForm, sent);
   }, [anonymousForm, updateProject]);
 
   const userDirty = userForm.formState.isDirty;

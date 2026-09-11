@@ -9,10 +9,11 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { PageLayout } from '@/components/ui/page-layout';
-import { useRegisterSave } from '@/components/ui/save-controller';
+import { useRegisterFormSave } from '@/components/ui/save-controller';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Heading } from '@/components/ui/typography';
+import { useSyncFormDefaults } from '@/hooks/useSyncFormDefaults';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/router';
 import Prism from 'prismjs';
@@ -57,9 +58,7 @@ export default function ProjectSettingsDesign() {
     defaultValues: defaults(),
   });
 
-  useEffect(() => {
-    form.reset(defaults());
-  }, [form, defaults]);
+  useSyncFormDefaults(form, defaults, data);
 
   const { fields, append, remove } = useFieldArray({
     name: 'cssUrls',
@@ -87,7 +86,7 @@ export default function ProjectSettingsDesign() {
     }
   }, [form, updateProject]);
 
-  useRegisterSave({ isDirty: form.formState.isDirty, save });
+  useRegisterFormSave(form, save);
 
   const { watch } = form;
   const fieldValue = watch('cssCustom');

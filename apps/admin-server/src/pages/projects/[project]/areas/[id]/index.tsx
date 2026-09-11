@@ -11,16 +11,17 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { PageLayout } from '@/components/ui/page-layout';
-import { useRegisterSave } from '@/components/ui/save-controller';
+import { useRegisterFormSave } from '@/components/ui/save-controller';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Heading } from '@/components/ui/typography';
 import useArea from '@/hooks/use-area';
 import useTags from '@/hooks/use-tags';
+import { useSyncFormDefaults } from '@/hooks/useSyncFormDefaults';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/router';
-import React, { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 
@@ -64,9 +65,7 @@ export default function ProjectAreaEdit() {
     defaultValues: {},
   });
 
-  useEffect(() => {
-    form.reset(defaults());
-  }, [form, defaults]);
+  useSyncFormDefaults(form, defaults, data);
 
   const save = useCallback(async () => {
     const valid = await form.trigger();
@@ -88,7 +87,7 @@ export default function ProjectAreaEdit() {
     }
   }, [form, updateArea]);
 
-  useRegisterSave({ isDirty: form.formState.isDirty, save });
+  useRegisterFormSave(form, save);
 
   return (
     <div>
@@ -223,7 +222,9 @@ export default function ProjectAreaEdit() {
                                       ? [...ids, tag.id]
                                       : ids.filter((id) => id !== tag.id);
 
-                                    form.setValue('tagIds', idsToSave);
+                                    form.setValue('tagIds', idsToSave, {
+                                      shouldDirty: true,
+                                    });
                                   }}
                                 />
                               </div>
@@ -269,7 +270,9 @@ export default function ProjectAreaEdit() {
                                       ? [...ids, tag.id]
                                       : ids.filter((id) => id !== tag.id);
 
-                                    form.setValue('tagIdsOutside', idsToSave);
+                                    form.setValue('tagIdsOutside', idsToSave, {
+                                      shouldDirty: true,
+                                    });
                                   }}
                                 />
                               </div>

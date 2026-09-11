@@ -12,11 +12,12 @@ import {
 import InfoDialog from '@/components/ui/info-hover';
 import { Input } from '@/components/ui/input';
 import { PageLayout } from '@/components/ui/page-layout';
-import { useRegisterSave } from '@/components/ui/save-controller';
+import { useRegisterFormSave } from '@/components/ui/save-controller';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Heading } from '@/components/ui/typography';
 import useTag from '@/hooks/use-tag';
+import { useSyncFormDefaults } from '@/hooks/useSyncFormDefaults';
 import { YesNoSelect, undefinedToTrueOrProp } from '@/lib/form-widget-helpers';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { X } from 'lucide-react';
@@ -97,9 +98,7 @@ export default function ProjectTagEdit({ preset }: { preset?: string }) {
     }
   }, [form.watch('useDifferentSubmitAddress')]);
 
-  useEffect(() => {
-    form.reset(defaults());
-  }, [form, defaults]);
+  useSyncFormDefaults(form, defaults, data);
 
   const save = useCallback(async () => {
     const valid = await form.trigger();
@@ -139,7 +138,7 @@ export default function ProjectTagEdit({ preset }: { preset?: string }) {
     }
   }, [form, updateTag]);
 
-  useRegisterSave({ isDirty: form.formState.isDirty, save });
+  useRegisterFormSave(form, save);
 
   return (
     <div>
@@ -311,7 +310,9 @@ export default function ProjectTagEdit({ preset }: { preset?: string }) {
                             typeof imageResult.url !== 'undefined'
                               ? imageResult.url
                               : '';
-                          form.setValue('mapIcon', result);
+                          form.setValue('mapIcon', result, {
+                            shouldDirty: true,
+                          });
                           form.resetField('mapIconUploader');
                           form.trigger('mapIcon');
                         }}
@@ -329,7 +330,9 @@ export default function ProjectTagEdit({ preset }: { preset?: string }) {
                                 <Button
                                   color="red"
                                   onClick={() => {
-                                    form.setValue('mapIcon', '');
+                                    form.setValue('mapIcon', '', {
+                                      shouldDirty: true,
+                                    });
                                   }}
                                   className="absolute right-0 top-0">
                                   <X size={24} />
@@ -485,7 +488,9 @@ export default function ProjectTagEdit({ preset }: { preset?: string }) {
                           typeof imageResult.url !== 'undefined'
                             ? imageResult.url
                             : '';
-                        form.setValue('defaultResourceImage', result);
+                        form.setValue('defaultResourceImage', result, {
+                          shouldDirty: true,
+                        });
                         form.resetField('image');
                         form.trigger('defaultResourceImage');
                       }}
@@ -505,7 +510,9 @@ export default function ProjectTagEdit({ preset }: { preset?: string }) {
                             <Button
                               color="red"
                               onClick={() => {
-                                form.setValue('defaultResourceImage', '');
+                                form.setValue('defaultResourceImage', '', {
+                                  shouldDirty: true,
+                                });
                               }}
                               style={{
                                 position: 'absolute',

@@ -15,18 +15,23 @@ import InfoDialog from '@/components/ui/info-hover';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PageLayout } from '@/components/ui/page-layout';
-import { useRegisterSave } from '@/components/ui/save-controller';
+import {
+  rebaselineAfterSave,
+  useRegisterSave,
+} from '@/components/ui/save-controller';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Heading } from '@/components/ui/typography';
 import useNotificationTemplate from '@/hooks/use-notification-template';
+import { useSyncFormDefaults } from '@/hooks/useSyncFormDefaults';
 import { YesNoSelect } from '@/lib/form-widget-helpers';
 import { EditFieldProps } from '@/lib/form-widget-helpers/EditFieldProps';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as Switch from '@radix-ui/react-switch';
+import cloneDeep from 'lodash/cloneDeep';
 import { useRouter } from 'next/router';
 import React from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import * as z from 'zod';
@@ -123,14 +128,13 @@ export default function ProjectSettingsUsers(
     defaultValues: emailDefaults(),
   });
 
-  useEffect(() => {
-    usersForm.reset(usersDefaults());
-  }, [usersForm, usersDefaults]);
+  // Each form waits for the section its own defaults read: a save's response
+  // carries only part of the project, so a plain `data` check would re-baseline
+  // a form to empty values right after saving. `canCreateNewUsers` defaults to
+  // true on a missing section, so an unguarded reset switches it on by itself.
+  useSyncFormDefaults(usersForm, usersDefaults, data?.config);
 
-  useEffect(() => {
-    anonymizeForm.reset(anonymizeDefaults());
-    emailForm.reset(emailDefaults());
-  }, [anonymizeForm, anonymizeDefaults, emailForm, emailDefaults]);
+  useSyncFormDefaults(anonymizeForm, anonymizeDefaults, data?.config);
 
   const saveUsers = useCallback(async () => {
     const valid = await usersForm.trigger();
@@ -143,6 +147,7 @@ export default function ProjectSettingsUsers(
       );
     }
     const values = usersFormSchema.parse(usersForm.getValues());
+    const sent = cloneDeep(usersForm.getValues());
     const result = await updateProject({
       users: {
         canCreateNewUsers: values.canCreateNewUsers,
@@ -151,6 +156,8 @@ export default function ProjectSettingsUsers(
     if (!result) {
       throw new Error('Er is helaas iets mis gegaan.');
     }
+
+    rebaselineAfterSave(usersForm, sent);
   }, [usersForm, updateProject]);
 
   const saveAnonymize = useCallback(async () => {
@@ -164,12 +171,15 @@ export default function ProjectSettingsUsers(
       );
     }
     const values = anonymizeFormSchema.parse(anonymizeForm.getValues());
+    const sent = cloneDeep(anonymizeForm.getValues());
     const result = await updateProject({
       [anonymizeCategory]: values,
     });
     if (!result) {
       throw new Error('Er is helaas iets mis gegaan.');
     }
+
+    rebaselineAfterSave(anonymizeForm, sent);
   }, [anonymizeForm, updateProject]);
 
   const usersDirty = usersForm.formState.isDirty;

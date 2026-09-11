@@ -11,7 +11,7 @@ import { FormObjectSelectField } from '@/components/ui/form-object-select-field'
 import InfoDialog from '@/components/ui/info-hover';
 import { Input } from '@/components/ui/input';
 import { PageLayout } from '@/components/ui/page-layout';
-import { useRegisterSave } from '@/components/ui/save-controller';
+import { useRegisterFormSave } from '@/components/ui/save-controller';
 import {
   Select,
   SelectContent,
@@ -22,6 +22,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Heading } from '@/components/ui/typography';
 import useArea from '@/hooks/use-areas';
+import { useSyncFormDefaults } from '@/hooks/useSyncFormDefaults';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/router';
 import * as React from 'react';
@@ -56,20 +57,20 @@ export default function ProjectSettingsMap() {
       customUrl: data?.config?.map?.customUrl || '',
       autoZoomAndCenter: data?.config?.map?.autoZoomAndCenter || 'area',
     };
-  }, [data, areas]);
+  }, [data]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver<any>(formSchema),
     defaultValues: defaults(),
   });
 
-  useEffect(() => {
-    form.reset(defaults());
-  }, [form, defaults]);
+  useSyncFormDefaults(form, defaults, data);
 
   const save = useCallback(async () => {
     if (disabled) {
-      throw new Error('Er is helaas iets mis gegaan.');
+      throw new Error(
+        'De minimale zoom mag niet groter zijn dan de maximale zoom.'
+      );
     }
     const valid = await form.trigger();
     if (!valid) {
@@ -91,7 +92,7 @@ export default function ProjectSettingsMap() {
     }
   }, [form, updateProject, disabled]);
 
-  useRegisterSave({ isDirty: form.formState.isDirty, save });
+  useRegisterFormSave(form, save);
 
   useEffect(() => {
     const minZoomValue = form.watch('minZoom');
@@ -146,130 +147,25 @@ export default function ProjectSettingsMap() {
           <Form {...form} className="p-6 bg-white rounded-md">
             <Heading size="xl">Kaart instellingen</Heading>
             <Separator className="my-4" />
-            <div className="lg:w-2/3 grid grid-cols-1 lg:grid-cols-2 gap-x-4 gap-y-8">
-              <FormField
-                control={form.control}
-                name="minZoom"
-                render={({ field }) => (
-                  <FormItem className="col-span-1">
-                    <FormLabel>
-                      Tot welk niveau mogen gebruikers uitzoomen?
-                      <InfoDialog content="Gebruik een waarde tussen 7 en 20 om het zoomniveau in te stellen. Bij niveau 7 is heel Nederland zichtbaar, terwijl niveau 20 het maximale detailniveau vertegenwoordigt, waarbij je kunt inzoomen tot individuele huizen." />
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min="7"
-                        max="20"
-                        placeholder="7"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="maxZoom"
-                render={({ field }) => (
-                  <FormItem className="col-span-1">
-                    <FormLabel>
-                      Tot welk niveau mogen gebruikers inzoomen?
-                      <InfoDialog content="Gebruik een waarde tussen 7 en 20 om het zoomniveau in te stellen. Bij niveau 7 is heel Nederland zichtbaar, terwijl niveau 20 het maximale detailniveau vertegenwoordigt, waarbij je kunt inzoomen tot individuele huizen." />
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min="7"
-                        max="20"
-                        placeholder="20"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormObjectSelectField
-                form={form}
-                fieldName="areaId"
-                fieldLabel="Polygon voor kaarten"
-                fieldInfo="Op de pagina 'Polygonen' kun je een eigen gebied aanmaken. Selecteer hieronder het gebied waar dit project onder valt."
-                items={areas}
-                keyForValue="id"
-                label={(area: any) => `${area.name}`}
-                noSelection="&nbsp;"
-              />
-
-              <FormField
-                control={form.control}
-                name="tilesVariant"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      Welke weergave van de kaart wil je gebruiken?
-                    </FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value || 'nlmaps'}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecteer een kaartweergave" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {tileLayerOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {!!form.watch('tilesVariant') &&
-                form.watch('tilesVariant') !== 'nlmaps' && (
-                  <p
-                    style={{
-                      backgroundColor: '#d69e2e',
-                      color: 'black',
-                      padding: '15px',
-                      borderLeft: '4px solid black',
-                      borderTopRightRadius: '5px',
-                      borderBottomRightRadius: '5px',
-                      marginTop: '10px',
-                      fontSize: '13px',
-                    }}
-                    className="lg:w-full lg:col-span-2">
-                    <strong>Let op!</strong> Wanneer je een andere kaartweergave
-                    kiest dan de &quot;Nederlandse Kaart&quot;, en je hebt een
-                    Content Security Policy (CSP) ingesteld, moet je ervoor
-                    zorgen dat je de juiste headers toevoegt aan je CSP. <br />{' '}
-                    <br />
-                    Lees meer over CSP instellingen voor kaartweergaven bij{' '}
-                    <strong>
-                      Projectinstellingen &gt; Algemeen &gt; Beveiligingsheaders
-                    </strong>
-                  </p>
-                )}
-
-              {form.watch('tilesVariant') === 'custom' && (
+            {!data ? (
+              <p>Instellingen worden geladen...</p>
+            ) : (
+              <div className="lg:w-2/3 grid grid-cols-1 lg:grid-cols-2 gap-x-4 gap-y-8">
                 <FormField
                   control={form.control}
-                  name="customUrl"
+                  name="minZoom"
                   render={({ field }) => (
                     <FormItem className="col-span-1">
-                      <FormLabel>Aangepaste URL</FormLabel>
-                      <FormDescription>{`Voer de URL in voor de aangepaste kaartweergave. Bijvoorbeeld: https://example.com/tiles/{z}/{x}/{y}.png`}</FormDescription>
+                      <FormLabel>
+                        Tot welk niveau mogen gebruikers uitzoomen?
+                        <InfoDialog content="Gebruik een waarde tussen 7 en 20 om het zoomniveau in te stellen. Bij niveau 7 is heel Nederland zichtbaar, terwijl niveau 20 het maximale detailniveau vertegenwoordigt, waarbij je kunt inzoomen tot individuele huizen." />
+                      </FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="https://example.com/tiles/{z}/{x}/{y}.png"
+                          type="number"
+                          min="7"
+                          max="20"
+                          placeholder="7"
                           {...field}
                         />
                       </FormControl>
@@ -277,48 +173,158 @@ export default function ProjectSettingsMap() {
                     </FormItem>
                   )}
                 />
-              )}
 
-              <FormField
-                control={form.control}
-                name="autoZoomAndCenter"
-                render={({ field }) => (
-                  <FormItem className="md:col-span-2">
-                    <FormLabel>
-                      Waarop moet de kaart automatisch centreren?
-                    </FormLabel>
-                    <FormDescription>
-                      Kies of de kaart moet centreren op het geselecteerde
-                      gebied (polygoon) of op alle zichtbare punten op de kaart.
-                      Het centreren gebeurt bij het laden van de pagina en na
-                      het filteren in een overzicht.
-                    </FormDescription>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value || 'area'}>
+                <FormField
+                  control={form.control}
+                  name="maxZoom"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1">
+                      <FormLabel>
+                        Tot welk niveau mogen gebruikers inzoomen?
+                        <InfoDialog content="Gebruik een waarde tussen 7 en 20 om het zoomniveau in te stellen. Bij niveau 7 is heel Nederland zichtbaar, terwijl niveau 20 het maximale detailniveau vertegenwoordigt, waarbij je kunt inzoomen tot individuele huizen." />
+                      </FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Gebied" />
-                        </SelectTrigger>
+                        <Input
+                          type="number"
+                          min="7"
+                          max="20"
+                          placeholder="20"
+                          {...field}
+                        />
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="area">
-                          <strong>Gebied</strong>: De kaart zoomt automatisch in
-                          en centreert zich op het geselecteerde gebied
-                          (polygoon).
-                        </SelectItem>
-                        <SelectItem value="markers">
-                          <strong>Punten</strong>: De kaart zoomt automatisch in
-                          en centreert zich op alle zichtbare punten op de
-                          kaart.
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormObjectSelectField
+                  form={form}
+                  fieldName="areaId"
+                  fieldLabel="Polygon voor kaarten"
+                  fieldInfo="Op de pagina 'Polygonen' kun je een eigen gebied aanmaken. Selecteer hieronder het gebied waar dit project onder valt."
+                  items={areas}
+                  keyForValue="id"
+                  label={(area: any) => `${area.name}`}
+                  noSelection="&nbsp;"
+                />
+
+                <FormField
+                  control={form.control}
+                  name="tilesVariant"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Welke weergave van de kaart wil je gebruiken?
+                      </FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value || 'nlmaps'}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecteer een kaartweergave" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {tileLayerOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {!!form.watch('tilesVariant') &&
+                  form.watch('tilesVariant') !== 'nlmaps' && (
+                    <p
+                      style={{
+                        backgroundColor: '#d69e2e',
+                        color: 'black',
+                        padding: '15px',
+                        borderLeft: '4px solid black',
+                        borderTopRightRadius: '5px',
+                        borderBottomRightRadius: '5px',
+                        marginTop: '10px',
+                        fontSize: '13px',
+                      }}
+                      className="lg:w-full lg:col-span-2">
+                      <strong>Let op!</strong> Wanneer je een andere
+                      kaartweergave kiest dan de &quot;Nederlandse Kaart&quot;,
+                      en je hebt een Content Security Policy (CSP) ingesteld,
+                      moet je ervoor zorgen dat je de juiste headers toevoegt
+                      aan je CSP. <br /> <br />
+                      Lees meer over CSP instellingen voor kaartweergaven bij{' '}
+                      <strong>
+                        Projectinstellingen &gt; Algemeen &gt;
+                        Beveiligingsheaders
+                      </strong>
+                    </p>
+                  )}
+
+                {form.watch('tilesVariant') === 'custom' && (
+                  <FormField
+                    control={form.control}
+                    name="customUrl"
+                    render={({ field }) => (
+                      <FormItem className="col-span-1">
+                        <FormLabel>Aangepaste URL</FormLabel>
+                        <FormDescription>{`Voer de URL in voor de aangepaste kaartweergave. Bijvoorbeeld: https://example.com/tiles/{z}/{x}/{y}.png`}</FormDescription>
+                        <FormControl>
+                          <Input
+                            placeholder="https://example.com/tiles/{z}/{x}/{y}.png"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 )}
-              />
-            </div>
+
+                <FormField
+                  control={form.control}
+                  name="autoZoomAndCenter"
+                  render={({ field }) => (
+                    <FormItem className="md:col-span-2">
+                      <FormLabel>
+                        Waarop moet de kaart automatisch centreren?
+                      </FormLabel>
+                      <FormDescription>
+                        Kies of de kaart moet centreren op het geselecteerde
+                        gebied (polygoon) of op alle zichtbare punten op de
+                        kaart. Het centreren gebeurt bij het laden van de pagina
+                        en na het filteren in een overzicht.
+                      </FormDescription>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value || 'area'}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Gebied" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="area">
+                            <strong>Gebied</strong>: De kaart zoomt automatisch
+                            in en centreert zich op het geselecteerde gebied
+                            (polygoon).
+                          </SelectItem>
+                          <SelectItem value="markers">
+                            <strong>Punten</strong>: De kaart zoomt automatisch
+                            in en centreert zich op alle zichtbare punten op de
+                            kaart.
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
           </Form>
         </div>
       </PageLayout>

@@ -15,7 +15,10 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useRegisterSave } from '@/components/ui/save-controller';
+import {
+  rebaselineAfterSave,
+  useRegisterSave,
+} from '@/components/ui/save-controller';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Heading } from '@/components/ui/typography';
@@ -23,7 +26,9 @@ import { useProject } from '@/hooks/use-project';
 import useResource from '@/hooks/use-resource';
 import useStatuses from '@/hooks/use-statuses';
 import useTags from '@/hooks/use-tags';
+import { useSyncFormDefaults } from '@/hooks/useSyncFormDefaults';
 import { zodResolver } from '@hookform/resolvers/zod';
+import cloneDeep from 'lodash/cloneDeep';
 import {
   ArrowDown,
   ArrowLeft,
@@ -34,7 +39,7 @@ import {
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import * as z from 'zod';
@@ -323,10 +328,23 @@ export default function ResourceForm({ onFormSubmit, useGlobalSave }: Props) {
     return () => clearTimeout(timeoutId);
   }, [pendingUserId, project, existingData?.userId]);
 
+  // One schema instance for both the resolver and `save`: the header save has
+  // to parse with exactly what `trigger()` validated against, or the two could
+  // disagree and `parse` would throw a raw ZodError into the save bar.
+  const schema = useMemo(
+    () => formSchema(titleLimits, summaryLimits, descriptionLimits),
+    [
+      titleLimits.min,
+      titleLimits.max,
+      summaryLimits.min,
+      summaryLimits.max,
+      descriptionLimits.min,
+      descriptionLimits.max,
+    ]
+  );
+
   const form = useForm<FormType>({
-    resolver: zodResolver<any>(
-      formSchema(titleLimits, summaryLimits, descriptionLimits)
-    ),
+    resolver: zodResolver<any>(schema),
     defaultValues: defaults(),
   });
 
@@ -375,23 +393,36 @@ export default function ResourceForm({ onFormSubmit, useGlobalSave }: Props) {
     if (!valid) {
       throw new Error('Controleer de gemarkeerde velden.');
     }
-    const finalValues = buildSubmitValues(form.getValues());
+    // `getValues()` hands out the raw input. Only the schema applies the
+    // `z.coerce` on budget, userId and originalId, and the removed submit
+    // button got that for free from `handleSubmit` — so the header save has to
+    // parse as well, or those fields persist as strings.
+    const sent = cloneDeep(form.getValues());
+    const finalValues = buildSubmitValues(schema.parse(sent) as FormType);
     await onFormSubmit(finalValues);
+
+    rebaselineAfterSave(form, sent);
 
     // SWR reload
     const url = `/api/openstad/api/project/${project}/resource/${id}`;
     mutate(url);
-  }, [form, buildSubmitValues, onFormSubmit, project, id, mutate]);
+  }, [form, schema, buildSubmitValues, onFormSubmit, project, id, mutate]);
 
   useRegisterSave({
-    isDirty: !!useGlobalSave && form.formState.isDirty,
+    enabled: !!useGlobalSave,
+    isDirty: form.formState.isDirty,
     save,
   });
 
+  // Edit: re-baseline on the stored resource, but never over unsaved input. A
+  // background revalidation landing mid-edit would otherwise reset the form and
+  // clear the dirty flag the header bar reads.
+  useSyncFormDefaults(form, defaults, existingData);
+
   useEffect(() => {
-    if (existingData) {
-      form.reset(defaults());
-    } else {
+    // The edit path is handled by useSyncFormDefaults above; this only seeds a
+    // brand-new resource with the project's default tags and statuses.
+    if (!existingData) {
       let resetValues: { tags?: number[]; statuses?: number[] } = {};
       if (projectData?.config?.resources?.defaultTagIds) {
         const selectedTags = form.getValues('tags') || [];
@@ -497,12 +528,29 @@ export default function ResourceForm({ onFormSubmit, useGlobalSave }: Props) {
           JSON.stringify({
             lat: parseFloat(formatted[0]),
             lng: parseFloat(formatted[1]),
-          })
+          }),
+          { shouldDirty: true }
         );
       }
     },
     [form]
   );
+
+  // Editing an existing resource: hold the form back until it has arrived.
+  // Rendering the empty form first lets a keystroke in the loading window win
+  // the dirty guard, which then keeps the required title/summary/description
+  // blank and leaves the page unsaveable.
+  if (id && !existingData) {
+    return (
+      <div className="p-6 bg-white rounded-md">
+        <p>
+          {error
+            ? 'De inzending kon niet worden geladen.'
+            : 'De inzending wordt geladen...'}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 bg-white rounded-md">
@@ -571,7 +619,7 @@ export default function ResourceForm({ onFormSubmit, useGlobalSave }: Props) {
             onImageUploaded={(imageResult) => {
               let array = [...(form.getValues('images') || [])];
               array.push(imageResult);
-              form.setValue('images', array);
+              form.setValue('images', array, { shouldDirty: true });
               form.resetField('image');
               form.trigger('images');
             }}
@@ -594,7 +642,7 @@ export default function ResourceForm({ onFormSubmit, useGlobalSave }: Props) {
             onDocumentUploaded={(documentResult) => {
               let array = [...(form.getValues('documents') || [])];
               array.push(documentResult);
-              form.setValue('documents', array);
+              form.setValue('documents', array, { shouldDirty: true });
               form.resetField('document');
               form.trigger('documents');
             }}
@@ -737,7 +785,9 @@ export default function ResourceForm({ onFormSubmit, useGlobalSave }: Props) {
                             ) {
                               array[index].name = e.target.value;
 
-                              form.setValue('documents', array);
+                              form.setValue('documents', array, {
+                                shouldDirty: true,
+                              });
                               form.trigger('documents');
                             }
                           }}
@@ -1128,7 +1178,8 @@ export default function ResourceForm({ onFormSubmit, useGlobalSave }: Props) {
                   'tags',
                   checked
                     ? [...values, tag.id]
-                    : values.filter((id) => id !== tag.id)
+                    : values.filter((id) => id !== tag.id),
+                  { shouldDirty: true }
                 );
               }}
             />
@@ -1150,7 +1201,8 @@ export default function ResourceForm({ onFormSubmit, useGlobalSave }: Props) {
                   'statuses',
                   checked
                     ? [...values, status.id]
-                    : values.filter((id) => id !== status.id)
+                    : values.filter((id) => id !== status.id),
+                  { shouldDirty: true }
                 );
               }}
             />
@@ -1176,7 +1228,9 @@ export default function ResourceForm({ onFormSubmit, useGlobalSave }: Props) {
                       onValueChange={(value) => {
                         try {
                           const parsedValue = JSON.parse(value); // Parse the JSON to make sure it's valid
-                          form.setValue('extraData', parsedValue); // Set the value of the field
+                          form.setValue('extraData', parsedValue, {
+                            shouldDirty: true,
+                          });
                           setExtraData(JSON.stringify(parsedValue));
                         } catch (error) {}
                       }}

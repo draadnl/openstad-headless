@@ -18,14 +18,19 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { PageLayout } from '@/components/ui/page-layout';
-import { useRegisterSave } from '@/components/ui/save-controller';
+import {
+  rebaselineAfterSave,
+  useRegisterSave,
+} from '@/components/ui/save-controller';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Heading } from '@/components/ui/typography';
+import { useSyncFormDefaults } from '@/hooks/useSyncFormDefaults';
 import { validateProjectNumber } from '@/lib/validateProjectNumber';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as Switch from '@radix-ui/react-switch';
+import cloneDeep from 'lodash/cloneDeep';
 import { useRouter } from 'next/router';
 import * as React from 'react';
 import { useCallback, useEffect, useState } from 'react';
@@ -115,11 +120,7 @@ export default function ProjectSettings() {
     defaultValues: defaults(),
   });
 
-  useEffect(() => {
-    form.reset(defaults());
-    // if(basicAuthActive !== data?.config?.basicAuth?.active)
-    //   setBasicAuthActive(data?.config?.basicAuth?.active);
-  }, [form, defaults]);
+  useSyncFormDefaults(form, defaults, data);
 
   useEffect(() => {
     if (!data) return;
@@ -128,7 +129,7 @@ export default function ProjectSettings() {
       const toggle = data?.config?.project?.projectToggle ?? !!data?.url;
       setShowUrl(toggle);
       setCheckboxInitial(false);
-      setProjectHasEnded(data?.config?.project?.projectHasEnded);
+      setProjectHasEnded(!!data?.config?.project?.projectHasEnded);
     }
 
     if (basicAuthInitial) {
@@ -136,6 +137,9 @@ export default function ProjectSettings() {
       setBasicAuthInitial(false);
     }
   }, [data, checkboxInitial, basicAuthInitial, form]);
+
+  const savedProjectHasEnded = !!data?.config?.project?.projectHasEnded;
+  const projectHasEndedDirty = !!projectHasEnded !== savedProjectHasEnded;
 
   const save = useCallback(async () => {
     const valid = await form.trigger();
@@ -151,12 +155,14 @@ export default function ProjectSettings() {
       throw new Error('Controleer de gemarkeerde velden.');
     }
     const values = formSchema.parse(form.getValues());
+    const sent = cloneDeep(form.getValues());
     const result = await updateProject(
       {
         project: {
           endDate: values.endDate,
           projectToggle: values.projectToggle,
           lastUrl: values.url || data?.config?.project?.lastUrl || '',
+          projectHasEnded: !!projectHasEnded,
         },
         basicAuth: {
           active: values.basicAuthActive,
@@ -170,26 +176,17 @@ export default function ProjectSettings() {
     if (!result) {
       throw new Error('Er is helaas iets mis gegaan.');
     }
-  }, [form, updateProject, data]);
 
-  useRegisterSave({ isDirty: form.formState.isDirty, save });
+    rebaselineAfterSave(form, sent);
+  }, [form, updateProject, data, projectHasEnded]);
 
-  async function saveProjectHasEnded(value: boolean) {
-    try {
-      const project = await updateProject({
-        project: {
-          projectHasEnded: value,
-        },
-      });
-      if (project) {
-        toast.success('Project aangepast!');
-      } else {
-        toast.error('Er is helaas iets mis gegaan.');
-      }
-    } catch (error) {
-      console.error('could not update', error);
-    }
-  }
+  // The "Project beeindigen" toggle lives outside the form, so its dirty state
+  // is tracked separately and folded into the same save.
+  useRegisterSave({
+    isDirty: form.formState.isDirty || projectHasEndedDirty,
+    save,
+  });
+
   async function archiveProject() {
     if (!data?.config?.project?.projectHasEnded) {
       toast.error(
@@ -561,11 +558,6 @@ export default function ProjectSettings() {
                       <Switch.Thumb className="block w-[21px] h-[21px] bg-white rounded-full transition-transform duration-100 translate-x-0.5 will-change-transform data-[state=checked]:translate-x-[27px]" />
                     </Switch.Root>
                   </div>
-                  <Button
-                    className="mt-4 w-fit"
-                    onClick={() => saveProjectHasEnded(projectHasEnded)}>
-                    Opslaan
-                  </Button>
                 </div>
               </div>
             </TabsContent>

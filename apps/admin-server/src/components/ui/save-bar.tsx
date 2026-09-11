@@ -23,10 +23,17 @@ export function SaveBar() {
   } = useSaveController();
 
   const retryRef = useRef<HTMLButtonElement>(null);
+  const successRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (state === 'error') {
       retryRef.current?.focus();
+    }
+    // The save button is what the user pressed, and it is unmounted by this
+    // transition. Without moving focus onto the confirmation, a keyboard user
+    // is dropped back onto document.body with no idea what happened.
+    if (state === 'success') {
+      successRef.current?.focus();
     }
   }, [state]);
 
@@ -34,6 +41,8 @@ export function SaveBar() {
     return (
       <div
         role="status"
+        ref={successRef}
+        tabIndex={-1}
         className={cn(
           'flex items-center gap-2 rounded-md border px-4 py-2 text-sm',
           'border-green-200 bg-green-50 text-green-800'

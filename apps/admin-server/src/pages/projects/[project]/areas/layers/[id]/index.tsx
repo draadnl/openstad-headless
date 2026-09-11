@@ -10,15 +10,16 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { PageLayout } from '@/components/ui/page-layout';
-import { useRegisterSave } from '@/components/ui/save-controller';
+import { useRegisterFormSave } from '@/components/ui/save-controller';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Heading } from '@/components/ui/typography';
 import useDatalayer from '@/hooks/use-datalayer';
+import { useSyncFormDefaults } from '@/hooks/useSyncFormDefaults';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { X } from 'lucide-react';
 import { useRouter } from 'next/router';
-import React, { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import * as z from 'zod';
 
@@ -53,9 +54,7 @@ export default function ProjectDatalayerEdit() {
     defaultValues: {},
   });
 
-  useEffect(() => {
-    form.reset(defaults());
-  }, [form, defaults]);
+  useSyncFormDefaults(form, defaults, data);
 
   const save = useCallback(async () => {
     const valid = await form.trigger();
@@ -75,7 +74,7 @@ export default function ProjectDatalayerEdit() {
     }
   }, [form, updateDatalayer]);
 
-  useRegisterSave({ isDirty: form.formState.isDirty, save });
+  useRegisterFormSave(form, save);
 
   const { fields: iconField, remove: removeImage } = useFieldArray({
     control: form.control,
@@ -125,7 +124,7 @@ export default function ProjectDatalayerEdit() {
                 description="De ideale afmetingen voor een icoon zijn 30x40 pixels."
                 allowedTypes={['image/*']}
                 onImageUploaded={(imageResult) => {
-                  form.setValue('icon', [imageResult]);
+                  form.setValue('icon', [imageResult], { shouldDirty: true });
                   form.resetField('iconUploader');
                   form.trigger('icon');
                 }}

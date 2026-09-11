@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { PageLayout } from '@/components/ui/page-layout';
-import { useRegisterSave } from '@/components/ui/save-controller';
+import { useRegisterFormSave } from '@/components/ui/save-controller';
 import {
   Select,
   SelectContent,
@@ -22,12 +22,13 @@ import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Heading } from '@/components/ui/typography';
 import useStatus from '@/hooks/use-status';
+import { useSyncFormDefaults } from '@/hooks/useSyncFormDefaults';
 import { YesNoSelect } from '@/lib/form-widget-helpers';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { X } from 'lucide-react';
 import { useRouter } from 'next/router';
 import * as React from 'react';
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 
@@ -77,9 +78,7 @@ export default function ProjectStatusEdit() {
     defaultValues: defaults(),
   });
 
-  useEffect(() => {
-    form.reset(defaults());
-  }, [form, defaults]);
+  useSyncFormDefaults(form, defaults, data);
 
   const save = useCallback(async () => {
     const valid = await form.trigger();
@@ -107,7 +106,7 @@ export default function ProjectStatusEdit() {
     }
   }, [form, updateStatus]);
 
-  useRegisterSave({ isDirty: form.formState.isDirty, save });
+  useRegisterFormSave(form, save);
 
   const colors = [
     { value: 'FFFFFF', label: 'Wit' },
@@ -321,7 +320,9 @@ export default function ProjectStatusEdit() {
                             typeof imageResult.url !== 'undefined'
                               ? imageResult.url
                               : '';
-                          form.setValue('mapIcon', result);
+                          form.setValue('mapIcon', result, {
+                            shouldDirty: true,
+                          });
                           form.resetField('mapIconUploader');
                           form.trigger('mapIcon');
                         }}
@@ -339,7 +340,9 @@ export default function ProjectStatusEdit() {
                                 <Button
                                   color="red"
                                   onClick={() => {
-                                    form.setValue('mapIcon', '');
+                                    form.setValue('mapIcon', '', {
+                                      shouldDirty: true,
+                                    });
                                   }}
                                   className="absolute right-0 top-0">
                                   <X size={24} />

@@ -40,6 +40,13 @@ export function useWidgetConfig<R>(idOverride?: string) {
       );
 
       if (!res.ok) {
+        // `silent` suppresses the toast because the save bar reports the
+        // failure itself, but the cause must not disappear with it.
+        console.error(
+          'Saving the widget config failed',
+          res.status,
+          res.statusText
+        );
         if (!silent) toast.error('De configuratie kon niet worden aangepast');
         return null;
       }
@@ -49,6 +56,7 @@ export function useWidgetConfig<R>(idOverride?: string) {
       if (!silent) toast.success('Configuratie aangepast');
       return data;
     } catch (error) {
+      console.error('Saving the widget config failed', error);
       if (!silent) toast.error('De configuratie kon niet worden aangepast');
       return null;
     }

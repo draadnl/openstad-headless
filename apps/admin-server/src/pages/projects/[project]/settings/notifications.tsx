@@ -12,7 +12,7 @@ import InfoDialog from '@/components/ui/info-hover';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PageLayout } from '@/components/ui/page-layout';
-import { useRegisterSave } from '@/components/ui/save-controller';
+import { useRegisterFormSave } from '@/components/ui/save-controller';
 import {
   Select,
   SelectContent,
@@ -24,6 +24,7 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Heading } from '@/components/ui/typography';
 import { WhitelistedEmailSelect } from '@/components/ui/whitelisted-email-select';
+import { useSyncFormDefaults } from '@/hooks/useSyncFormDefaults';
 import {
   WithWhitelistedEmailsProps,
   withWhitelistedEmails,
@@ -31,7 +32,7 @@ import {
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/router';
 import * as React from 'react';
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 
@@ -81,9 +82,7 @@ export default function ProjectSettingsNotifications({
     defaultValues: defaults(),
   });
 
-  useEffect(() => {
-    form.reset(defaults());
-  }, [form, defaults]);
+  useSyncFormDefaults(form, defaults, data);
 
   const save = useCallback(async () => {
     const valid = await form.trigger();
@@ -109,7 +108,7 @@ export default function ProjectSettingsNotifications({
     }
   }, [form, updateProjectEmails, category]);
 
-  useRegisterSave({ isDirty: form.formState.isDirty, save });
+  useRegisterFormSave(form, save);
 
   return (
     <div>

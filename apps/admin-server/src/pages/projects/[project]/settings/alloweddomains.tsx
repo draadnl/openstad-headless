@@ -2,18 +2,23 @@ import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { PageLayout } from '@/components/ui/page-layout';
-import { useRegisterSave } from '@/components/ui/save-controller';
+import {
+  rebaselineAfterSave,
+  useRegisterSave,
+} from '@/components/ui/save-controller';
 import { Separator } from '@/components/ui/separator';
 import { Heading } from '@/components/ui/typography';
+import { useSyncFormDefaults } from '@/hooks/useSyncFormDefaults';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   getParentDomains,
   parseHost,
 } from '@openstad-headless/lib/allowed-domains';
+import cloneDeep from 'lodash/cloneDeep';
 import { Info, X } from 'lucide-react';
 import { useRouter } from 'next/router';
 import * as React from 'react';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import {
   Controller,
   UseFormProps,
@@ -81,12 +86,22 @@ export default function ProjectSettingsAllowedDomains() {
     return Array.from(seen);
   }, [projectHost, configuredDomains]);
 
-  const { control, reset, getValues, trigger, formState } = useZodForm({
+  const form = useZodForm({
     schema: formSchema,
     defaultValues: {
       urls: configuredDomains.map((url: string) => ({ url })),
     },
   });
+  const { control, reset, getValues, trigger, formState } = form;
+
+  const domainDefaults = useCallback(
+    () => ({
+      urls: (data?.config?.allowedDomains ?? []).map((url: string) => ({
+        url,
+      })),
+    }),
+    [data?.config?.allowedDomains]
+  );
 
   const save = useCallback(async () => {
     const valid = await trigger();
@@ -102,23 +117,20 @@ export default function ProjectSettingsAllowedDomains() {
       allowedDomains: out,
     };
 
+    const sent = cloneDeep(getValues());
     const result = await updateProject(newProjectConf);
     const doubleSave = await updateProject(newProjectConf);
 
     if (!result || !doubleSave) {
       throw new Error('Er is helaas iets mis gegaan.');
     }
-  }, [getValues, trigger, updateProject]);
+
+    rebaselineAfterSave(form, sent);
+  }, [form, getValues, trigger, updateProject]);
 
   useRegisterSave({ isDirty: formState.isDirty, save });
 
-  useEffect(() => {
-    if (data?.config?.allowedDomains) {
-      reset({
-        urls: (data.config.allowedDomains as string[]).map((url) => ({ url })),
-      });
-    }
-  }, [data, reset]);
+  useSyncFormDefaults(form, domainDefaults, data?.config);
 
   const { fields, append, remove } = useFieldArray({
     name: 'urls',

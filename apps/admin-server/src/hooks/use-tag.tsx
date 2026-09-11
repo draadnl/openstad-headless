@@ -1,3 +1,4 @@
+import { throwApiError } from '@/lib/api-error';
 import useSWR from 'swr';
 
 import { validateProjectNumber } from '../lib/validateProjectNumber';
@@ -56,7 +57,7 @@ export default function useTags(projectId?: string, id?: string) {
     });
 
     if (!res.ok) {
-      return null;
+      await throwApiError(res, 'De tag kon niet worden opgeslagen.');
     }
 
     return await res.json();

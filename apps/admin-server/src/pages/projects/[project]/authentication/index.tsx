@@ -13,7 +13,7 @@ import {
 import InfoDialog from '@/components/ui/info-hover';
 import { Input } from '@/components/ui/input';
 import { PageLayout } from '@/components/ui/page-layout';
-import { useRegisterSave } from '@/components/ui/save-controller';
+import { useRegisterFormSave } from '@/components/ui/save-controller';
 import {
   Select,
   SelectContent,
@@ -24,6 +24,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Heading } from '@/components/ui/typography';
 import { WhitelistedEmailSelect } from '@/components/ui/whitelisted-email-select';
+import { useSyncFormDefaults } from '@/hooks/useSyncFormDefaults';
 import {
   WithWhitelistedEmailsProps,
   withWhitelistedEmails,
@@ -62,9 +63,15 @@ const authTypes = [
 
 const formSchema = z.object({
   authTypes: z.string().array().default([]),
-  fromEmail: z.string().email().optional(),
+  // An emptied field arrives as '', which `.optional()` does not allow.
+  fromEmail: z
+    .union([z.string().email('Geen geldig e-mailadres'), z.literal('')])
+    .optional(),
   fromName: z.string().optional(),
-  contactEmail: z.string().email().optional(),
+  // An emptied field arrives as '', which `.optional()` does not allow.
+  contactEmail: z
+    .union([z.string().email('Geen geldig e-mailadres'), z.literal('')])
+    .optional(),
   defaultRoleId: z.enum(['2', '3']).optional(),
   imageLogo: z.string().optional(),
   logo: z.string().optional(),
@@ -123,11 +130,23 @@ export default function ProjectAuthentication({
     defaultValues: defaults(),
   });
 
-  useEffect(() => {
-    form.reset(defaults());
-  }, [form, defaults]);
+  // Guarded on the provider's `config` subtree, not on the provider itself:
+  // every value below lives under `provider.openstad.config`, and a save both
+  // strips that subtree from the body (api-server project.js) and answers with
+  // the raw project, so the provider stays truthy while those values are gone.
+  // Only the enriched GET carries `config`, so it is what tells the two apart.
+  // Re-baselining on such a response drops the fields from the form state
+  // without changing what is on screen, which the next save then writes away.
+  const authConfig = data?.config?.auth?.provider?.openstad?.config;
+
+  useSyncFormDefaults(form, defaults, authConfig);
 
   const save = useCallback(async () => {
+    // Saving before the auth config has arrived would write the empty form over
+    // the stored settings and wipe them.
+    if (!authConfig) {
+      throw new Error('De instellingen zijn nog niet geladen.');
+    }
     const valid = await form.trigger();
     if (!valid) {
       throw new Error('Controleer de gemarkeerde velden.');
@@ -176,13 +195,11 @@ export default function ProjectAuthentication({
       },
     };
 
-    if (values.cssUrl) {
-      updatedConfig.auth.provider.openstad.config.clientStylesheets = [
-        {
-          url: values.cssUrl,
-        },
-      ];
-    }
+    // The list is always sent, also when it is empty. Leaving the key out on an
+    // emptied field would keep the stored stylesheet, so clearing the URL would
+    // never take effect.
+    updatedConfig.auth.provider.openstad.config.clientStylesheets =
+      values.cssUrl ? [{ url: values.cssUrl }] : [];
 
     const project = await updateProject(updatedConfig);
     const doubleSave = await updateProject(updatedConfig);
@@ -190,9 +207,9 @@ export default function ProjectAuthentication({
     if (!doubleSave || !project) {
       throw new Error('Er is helaas iets mis gegaan.');
     }
-  }, [form, updateProject]);
+  }, [authConfig, form, updateProject]);
 
-  useRegisterSave({ isDirty: form.formState.isDirty, save });
+  useRegisterFormSave(form, save);
 
   const [showEmailFields, setShowEmailFields] = useState(false);
   useEffect(() => {
