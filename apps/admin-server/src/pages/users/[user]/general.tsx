@@ -17,9 +17,11 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { useRegisterFormSave } from '@/components/ui/save-controller';
 import { Separator } from '@/components/ui/separator';
 import { Heading } from '@/components/ui/typography';
 import useUser from '@/hooks/use-user';
+import { useSyncFormDefaults } from '@/hooks/useSyncFormDefaults';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useCallback, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -27,7 +29,11 @@ import { toast } from 'react-hot-toast';
 import * as z from 'zod';
 
 const formSchema = z.object({
-  email: z.string().email('Geen geldig e-mailadres').optional(),
+  // A user without an e-mail address keeps an empty field, which would fail
+  // `.email()` and block every save on this page.
+  email: z
+    .union([z.string().email('Geen geldig e-mailadres'), z.literal('')])
+    .optional(),
   name: z.string().optional(),
   phoneNumber: z.string().optional(),
   address: z.string().optional(),
@@ -78,9 +84,7 @@ export default function CreateUserGeneral() {
     defaultValues: defaults(),
   });
 
-  useEffect(() => {
-    form.reset(defaults());
-  }, [form, defaults]);
+  useSyncFormDefaults(form, defaults, data);
 
   // Fetch two-factor status
   useEffect(() => {
@@ -101,17 +105,16 @@ export default function CreateUserGeneral() {
     }
   }, [user]);
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
-    try {
-      await updateUser({ ...values, id: user.id, projectId: user.projectId });
-      toast.success('User is bijgewerkt');
-    } catch (err: unknown) {
-      toast.error(
-        (err instanceof Error && err.message) ||
-          'User kon niet worden bijgewerkt'
-      );
+  const save = useCallback(async () => {
+    const valid = await form.trigger();
+    if (!valid) {
+      throw new Error('Controleer de gemarkeerde velden.');
     }
-  }
+    const values = formSchema.parse(form.getValues());
+    await updateUser({ ...values, id: user.id, projectId: user.projectId });
+  }, [form, updateUser, user]);
+
+  useRegisterFormSave(form, save);
 
   async function handleResetTwoFactor() {
     try {
@@ -144,11 +147,8 @@ export default function CreateUserGeneral() {
       toast.success('Gebruiker is geanonimiseerd');
       setIsAnonymizeDialogOpen(false);
       setIsAnonymizeConfirmed(false);
-    } catch (error: unknown) {
-      toast.error(
-        (error instanceof Error && error.message) ||
-          'Gebruiker kon niet worden geanonimiseerd'
-      );
+    } catch (error: any) {
+      toast.error(error?.message || 'Gebruiker kon niet worden geanonimiseerd');
     } finally {
       setIsAnonymizing(false);
     }
@@ -162,7 +162,7 @@ export default function CreateUserGeneral() {
         <Heading size="xl">Algemene instellingen</Heading>
         <Separator className="my-4" />
         <form
-          onSubmit={form.handleSubmit(onSubmit)}
+          onSubmit={(e) => e.preventDefault()}
           className="lg:w-fit grid grid-cols-1 lg:grid-cols-2 gap-4 auto-rows-auto">
           <FormField
             control={form.control}
@@ -303,10 +303,6 @@ export default function CreateUserGeneral() {
               </FormItem>
             )}
           />
-
-          <Button className="col-span-full w-fit" type="submit">
-            Opslaan
-          </Button>
         </form>
       </Form>
 

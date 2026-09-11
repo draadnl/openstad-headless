@@ -2,14 +2,14 @@ import {
   AgendaItem,
   AgendaItemsEditor,
 } from '@/components/agenda-items-editor';
-import { Button } from '@/components/ui/button';
+import { useRegisterSave } from '@/components/ui/save-controller';
 import useResource from '@/hooks/use-resource';
 import useResources from '@/hooks/use-resources';
 import { withId } from '@/lib/widget-item-helpers';
 import { fillTimelineEndDates } from '@openstad-headless/lib/timeline-dates';
+import isEqual from 'lodash/isEqual';
 import { useRouter } from 'next/router';
-import React, { useEffect, useState } from 'react';
-import toast from 'react-hot-toast';
+import React, { useCallback, useEffect, useState } from 'react';
 
 export default function ProjectResourceTimeline() {
   const router = useRouter();
@@ -24,36 +24,44 @@ export default function ProjectResourceTimeline() {
   });
 
   const [items, setItems] = useState<AgendaItem[]>([]);
+  const [isDirty, setIsDirty] = useState(false);
+
+  // The items the save bar compares against. `withId` hands unsaved items a
+  // fresh id, so the baseline is kept as a snapshot instead of being derived
+  // from the resource on every render.
+  const savedItems = React.useRef<AgendaItem[]>([]);
 
   const itemsInitialized = React.useRef(false);
   useEffect(() => {
     if (!resource || itemsInitialized.current) return;
     itemsInitialized.current = true;
-    setItems(
-      fillTimelineEndDates(
-        (resource?.timeline ?? []).map(withId)
-      ) as AgendaItem[]
-    );
+    const seeded = fillTimelineEndDates(
+      (resource?.timeline ?? []).map(withId)
+    ) as AgendaItem[];
+    savedItems.current = seeded;
+    setItems(seeded);
+    setIsDirty(false);
   }, [resource?.id]);
 
   function handleItemsChange(next: AgendaItem[]) {
-    setItems(fillTimelineEndDates(next));
+    const filled = fillTimelineEndDates(next) as AgendaItem[];
+    setItems(filled);
+    setIsDirty(!isEqual(filled, savedItems.current));
   }
 
-  async function handleSave() {
+  const save = useCallback(async () => {
     if (!id) return;
 
-    try {
-      await update(Number.parseInt(id as string), {
-        timeline: fillTimelineEndDates(items),
-      });
-      itemsInitialized.current = false;
-      mutate();
-      toast.success('Tijdlijn opgeslagen');
-    } catch {
-      toast.error('Tijdlijn kon niet worden opgeslagen');
-    }
-  }
+    const timeline = fillTimelineEndDates(items) as AgendaItem[];
+    await update(Number.parseInt(id as string), { timeline });
+
+    savedItems.current = timeline;
+    setIsDirty(false);
+    itemsInitialized.current = false;
+    await mutate();
+  }, [id, items, update, mutate]);
+
+  useRegisterSave({ isDirty, save });
 
   if (!resource) return null;
 
@@ -65,11 +73,6 @@ export default function ProjectResourceTimeline() {
         showActiveDates={true}
         timelineMode={true}
       />
-      <div className="flex gap-2 mt-4">
-        <Button type="button" onClick={handleSave}>
-          Opslaan
-        </Button>
-      </div>
     </div>
   );
 }
