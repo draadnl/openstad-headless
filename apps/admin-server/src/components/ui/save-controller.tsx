@@ -1,12 +1,14 @@
 import useUnsavedChanges from '@/hooks/use-unsaved-changes';
 import cloneDeep from 'lodash/cloneDeep';
 import isEqual from 'lodash/isEqual';
+import { useRouter } from 'next/router';
 import {
   ReactNode,
   createContext,
   useCallback,
   useContext,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -34,6 +36,12 @@ export type SaveRegistration = {
    * permanently disabled save control next to the working one.
    */
   enabled?: boolean;
+  /**
+   * Name of the form this registration belongs to, used to say which one failed
+   * when a page registers several. Left out on a page with a single form: its
+   * own message is already unambiguous.
+   */
+  label?: string;
 };
 
 type SaveControllerValue = {
@@ -41,7 +49,7 @@ type SaveControllerValue = {
   errorMessage: string | null;
   isRegistered: boolean;
   isDirty: boolean;
-  register: (registration: SaveRegistration | null) => void;
+  register: (key: string, registration: SaveRegistration | null) => void;
   triggerSave: () => void;
   dismissError: () => void;
   /**
@@ -59,8 +67,26 @@ const SaveControllerContext = createContext<SaveControllerValue | null>(null);
 
 const SUCCESS_AUTO_HIDE_MS = 4000;
 
+const GENERIC_ERROR =
+  'Er is iets misgegaan bij het opslaan. Probeer het opnieuw.';
+
+/** Names of the forms that failed, capped so the bar stays readable. */
+function listLabels(labels: string[]): string {
+  const shown = labels.slice(0, 3).map((label) => `"${label}"`);
+  const rest = labels.length - shown.length;
+  return rest > 0 ? `${shown.join(', ')} en ${rest} andere` : shown.join(', ');
+}
+
+function errorMessageOf(error: unknown): string {
+  return error instanceof Error && error.message
+    ? error.message
+    : GENERIC_ERROR;
+}
+
 export function SaveControllerProvider({ children }: { children: ReactNode }) {
-  const registrationRef = useRef<SaveRegistration | null>(null);
+  // One entry per registered form. A page can hold several: the notification
+  // page renders one form per mail type, each saving its own record.
+  const registrationsRef = useRef(new Map<string, SaveRegistration>());
   const [isRegistered, setIsRegistered] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [phase, setPhase] = useState<'idle' | 'saving' | 'success' | 'error'>(
@@ -77,64 +103,130 @@ export function SaveControllerProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const syncAggregates = useCallback(() => {
+    const active = Array.from(registrationsRef.current.values()).filter(
+      (registration) => registration.enabled !== false
+    );
+    setIsRegistered(active.length > 0);
+    setIsDirty(active.some((registration) => registration.isDirty));
+  }, []);
+
+  const resetFeedback = useCallback(() => {
+    registrationToken.current += 1;
+    setErrorMessage(null);
+    clearSuccessTimer();
+    setPhase('idle');
+  }, [clearSuccessTimer]);
+
   const register = useCallback(
-    (registration: SaveRegistration | null) => {
-      registrationRef.current = registration;
+    (key: string, registration: SaveRegistration | null) => {
+      const registrations = registrationsRef.current;
       if (!registration) {
-        registrationToken.current += 1;
-        setIsRegistered(false);
-        setIsDirty(false);
-        setErrorMessage(null);
-        clearSuccessTimer();
-        setPhase('idle');
+        registrations.delete(key);
+        // Feedback is cleared only once the page holds no forms at all. A page
+        // with several forms unmounts one of them mid-save (a created record
+        // replaces its create form), which must not wipe the confirmation the
+        // user just earned. A route change clears it instead, see below.
+        if (registrations.size === 0) {
+          resetFeedback();
+        }
+        syncAggregates();
         return;
       }
-      setIsRegistered(true);
-      setIsDirty(!!registration.isDirty);
+      registrations.set(key, registration);
+      syncAggregates();
       if (registration.isDirty) {
         setPhase((prev) => (prev === 'success' ? 'idle' : prev));
       }
     },
-    [clearSuccessTimer]
+    [resetFeedback, syncAggregates]
   );
 
   const triggerSave = useCallback(() => {
-    const registration = registrationRef.current;
-    if (!registration) return;
+    const pending = Array.from(registrationsRef.current.entries()).filter(
+      ([, registration]) =>
+        registration.isDirty && registration.enabled !== false
+    );
+    if (pending.length === 0) return;
 
     const token = registrationToken.current;
     const isStale = () => registrationToken.current !== token;
+    const namedForms = registrationsRef.current.size > 1;
 
     clearSuccessTimer();
     setErrorMessage(null);
     setPhase('saving');
 
-    registration
-      .save()
-      .then(() => {
+    const saveAll = async () => {
+      const failures: { label?: string; message: string }[] = [];
+
+      // Sequential on purpose: several of these endpoints read, merge and write
+      // the same record, so parallel requests would let the last one win and
+      // silently drop the others.
+      for (const [key, snapshot] of pending) {
         if (isStale()) return;
-        // Dirty state is the registered page's to report, not this callback's.
+        const registrations = registrationsRef.current;
+        // A form can unmount while the batch runs; the snapshot keeps its
+        // pending edit saveable. One that is still mounted and already clean
+        // was saved by something else, so it is skipped.
+        const current = registrations.get(key);
+        if (current && !current.isDirty) continue;
+        const registration = current ?? snapshot;
+        try {
+          await registration.save();
+        } catch (error: unknown) {
+          // Carry on with the other forms: one broken form must not block the
+          // changes the user made everywhere else on the page.
+          failures.push({
+            label: registration.label,
+            message: errorMessageOf(error),
+          });
+        }
+      }
+
+      if (isStale()) return;
+
+      if (failures.length === 0) {
+        // Dirty state is the registered form's to report, not this callback's.
         // Every consumer clears it after a successful save and re-registers,
-        // which lands here as `setIsDirty(false)` through `register`. Forcing
-        // it false from here would also hide a field the user typed while the
-        // request was in flight: that edit was never sent, so the bar has to
-        // keep offering to save it.
+        // which lands here through `register`. Forcing it false from here would
+        // also hide a field the user typed while the request was in flight:
+        // that edit was never sent, so the bar has to keep offering to save it.
         setPhase('success');
         clearSuccessTimer();
         successTimer.current = setTimeout(() => {
           setPhase('idle');
           successTimer.current = null;
         }, SUCCESS_AUTO_HIDE_MS);
-      })
-      .catch((error: unknown) => {
-        if (isStale()) return;
-        const message =
-          error instanceof Error && error.message
-            ? error.message
-            : 'Er is iets misgegaan bij het opslaan. Probeer het opnieuw.';
-        setErrorMessage(message);
-        setPhase('error');
-      });
+        return;
+      }
+
+      const savedTheRest =
+        pending.length > failures.length
+          ? ' De overige wijzigingen zijn wel opgeslagen.'
+          : '';
+      const labels = failures
+        .map((failure) => failure.label)
+        .filter((label): label is string => !!label);
+
+      let message: string;
+      if (!namedForms || failures.length === 1) {
+        const prefix =
+          namedForms && failures[0].label ? `${failures[0].label}: ` : '';
+        message = `${prefix}${failures[0].message}${savedTheRest}`;
+      } else if (labels.length === failures.length) {
+        message = `De volgende onderdelen konden niet worden opgeslagen: ${listLabels(
+          labels
+        )}.${savedTheRest}`;
+      } else {
+        message = `${failures.length} onderdelen konden niet worden opgeslagen.${savedTheRest}`;
+      }
+
+      setErrorMessage(message);
+      setPhase('error');
+    };
+
+    saveAll();
   }, [clearSuccessTimer]);
 
   const dismissError = useCallback(() => {
@@ -142,14 +234,18 @@ export function SaveControllerProvider({ children }: { children: ReactNode }) {
     setPhase('idle');
   }, []);
 
-  const invalidateInFlightSave = useCallback(() => {
-    registrationToken.current += 1;
-    setErrorMessage(null);
-    clearSuccessTimer();
-    setPhase('idle');
-  }, [clearSuccessTimer]);
+  const invalidateInFlightSave = resetFeedback;
 
   useEffect(() => clearSuccessTimer, [clearSuccessTimer]);
+
+  // The per-form cleanup above no longer clears feedback on its own, so a page
+  // that is left behind would otherwise hand its error or confirmation to the
+  // next one.
+  const router = useRouter();
+  useEffect(() => {
+    router.events.on('routeChangeStart', resetFeedback);
+    return () => router.events.off('routeChangeStart', resetFeedback);
+  }, [router, resetFeedback]);
 
   const state: SaveState = useMemo(() => {
     if (phase === 'saving') return 'saving';
@@ -212,20 +308,27 @@ export function useSaveController(): SaveControllerValue {
  */
 export function useRegisterSave(registration: SaveRegistration) {
   const { register } = useSaveController();
+  // Identifies this component's own entry, so several forms on one page each
+  // keep their own registration and an unmounting one only clears its own.
+  const key = useId();
   const enabled = registration.enabled !== false;
 
   useEffect(() => {
     if (!enabled) return;
-    register(registration);
-  }, [register, enabled, registration.isDirty, registration.save]);
+    register(key, registration);
+  }, [
+    register,
+    key,
+    enabled,
+    registration.isDirty,
+    registration.save,
+    registration.label,
+  ]);
 
   useEffect(() => {
     if (!enabled) return;
-    // Only a component that registered may clear the registration: there is one
-    // slot, so an unmounting component that never registered would otherwise
-    // wipe the registration of the page it shares the route with.
-    return () => register(null);
-  }, [register, enabled]);
+    return () => register(key, null);
+  }, [register, key, enabled]);
 }
 
 /**
@@ -267,7 +370,7 @@ export function useRegisterFormSave(
     reset: (values?: any, options?: any) => void;
   },
   save: () => Promise<void>,
-  options?: { enabled?: boolean }
+  options?: { enabled?: boolean; label?: string }
 ) {
   const saveAndClearDirty = useCallback(async () => {
     const sent = cloneDeep(form.getValues());
@@ -277,6 +380,7 @@ export function useRegisterFormSave(
 
   useRegisterSave({
     enabled: options?.enabled,
+    label: options?.label,
     isDirty: form.formState.isDirty,
     save: saveAndClearDirty,
   });
