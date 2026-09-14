@@ -26,7 +26,9 @@ export function useWidgetPreview<T extends { [key: string]: any }>(
     const config = widget?.config;
     if (!config) return;
     if (typeof config === 'object') {
-      (config as any).showAdminHiddenPolygonStyling = true;
+      (
+        config as { showAdminHiddenPolygonStyling?: boolean }
+      ).showAdminHiddenPolygonStyling = true;
     }
 
     seededWidgetIdRef.current = currentId;

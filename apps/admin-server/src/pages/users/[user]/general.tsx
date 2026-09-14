@@ -147,8 +147,11 @@ export default function CreateUserGeneral() {
       toast.success('Gebruiker is geanonimiseerd');
       setIsAnonymizeDialogOpen(false);
       setIsAnonymizeConfirmed(false);
-    } catch (error: any) {
-      toast.error(error?.message || 'Gebruiker kon niet worden geanonimiseerd');
+    } catch (error: unknown) {
+      toast.error(
+        (error instanceof Error && error.message) ||
+          'Gebruiker kon niet worden geanonimiseerd'
+      );
     } finally {
       setIsAnonymizing(false);
     }

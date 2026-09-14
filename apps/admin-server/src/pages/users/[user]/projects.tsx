@@ -1,7 +1,6 @@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Form } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
 import { useRegisterSave } from '@/components/ui/save-controller';
 import { Separator } from '@/components/ui/separator';
 import { Heading, ListHeading, Paragraph } from '@/components/ui/typography';
@@ -26,16 +25,10 @@ type EmailNotificationConsent = {
   consent: boolean;
 };
 
-type ProjectDisplayName = {
-  projectId: string;
-  displayName: string;
-};
-
 type CombinedProjectRoleAndConsent = {
   projectId: string;
   roleId?: string;
   consent?: boolean;
-  displayName?: string;
 };
 
 export default function CreateUserProjects() {
@@ -45,9 +38,6 @@ export default function CreateUserProjects() {
   const [projectRoles, setProjectRoles] = useState<Array<ProjectRole>>([]);
   const [emailNotificationConsents, setEmailNotificationConsents] = useState<
     Array<EmailNotificationConsent>
-  >([]);
-  const [projectDisplayNames, setProjectDisplayNames] = useState<
-    Array<ProjectDisplayName>
   >([]);
 
   useEffect(() => {}, [projects, users]);
@@ -89,35 +79,13 @@ export default function CreateUserProjects() {
     });
   };
 
-  const addProjectDisplayName = (projectId: string, displayName: string) => {
-    setProjectDisplayNames((prev) => {
-      let updated = [...prev];
-      const index = updated.findIndex((e) => e.projectId === projectId);
-
-      if (index !== -1) {
-        updated[index].displayName = displayName;
-      } else {
-        updated.push({ projectId, displayName });
-      }
-      return updated;
-    });
-  };
-
   const save = useCallback(async () => {
     let error: any;
 
-    const combinedByProject = new Map<string, CombinedProjectRoleAndConsent>();
-    for (const entry of [
+    const mergedProjects: CombinedProjectRoleAndConsent[] = [
       ...projectRoles,
       ...emailNotificationConsents,
-      ...projectDisplayNames,
-    ]) {
-      const existing = combinedByProject.get(entry.projectId) || {
-        projectId: entry.projectId,
-      };
-      combinedByProject.set(entry.projectId, { ...existing, ...entry });
-    }
-    const mergedProjects = Array.from(combinedByProject.values());
+    ];
 
     for (let updateValue of mergedProjects) {
       let user = users;
@@ -129,17 +97,8 @@ export default function CreateUserProjects() {
       if (user) {
         try {
           const updatedUser = user;
-          if (
-            typeof updateValue.consent !== 'undefined' &&
-            user.emailNotificationConsent !== updateValue.consent
-          ) {
+          if (user.emailNotificationConsent !== updateValue.consent) {
             updatedUser.emailNotificationConsent = updateValue.consent;
-          }
-          if (
-            typeof updateValue.displayName !== 'undefined' &&
-            user.projectDisplayName !== (updateValue.displayName || null)
-          ) {
-            updatedUser.projectDisplayName = updateValue.displayName || null;
           }
           if (
             typeof updateValue.roleId !== 'undefined' &&
@@ -159,17 +118,13 @@ export default function CreateUserProjects() {
             const newUser = {
               ...user,
               projectId: updateValue.projectId,
-              role: updateValue.roleId || 'member',
-              nickName: null,
-              projectDisplayName: updateValue.displayName || null,
-              emailNotificationConsent:
-                typeof updateValue.consent !== 'undefined'
-                  ? updateValue.consent
-                  : null,
-              privacyConsentAt: null,
-              listableByRole: null,
-              detailsViewableByRole: null,
             };
+            if (typeof updateValue.consent !== 'undefined') {
+              newUser.emailNotificationConsent = updateValue.consent;
+            }
+            if (updateValue.roleId) {
+              newUser.role = updateValue.roleId;
+            }
 
             await createUser(newUser);
           } catch (err) {
@@ -186,12 +141,10 @@ export default function CreateUserProjects() {
     // Clear the pending edits so the save bar can report success.
     setProjectRoles([]);
     setEmailNotificationConsents([]);
-    setProjectDisplayNames([]);
     await mutate();
   }, [
     projectRoles,
     emailNotificationConsents,
-    projectDisplayNames,
     users,
     updateUser,
     createUser,
@@ -199,12 +152,9 @@ export default function CreateUserProjects() {
   ]);
 
   useRegisterSave({
-    // Every edit on this page lands in one of these three lists, so a
+    // Every edit on this page lands in one of these two lists, so a
     // non-empty list is the page's unsaved state.
-    isDirty:
-      projectRoles.length > 0 ||
-      emailNotificationConsents.length > 0 ||
-      projectDisplayNames.length > 0,
+    isDirty: projectRoles.length > 0 || emailNotificationConsents.length > 0,
     save,
   });
 
@@ -240,10 +190,9 @@ export default function CreateUserProjects() {
 
         <form onSubmit={(e) => e.preventDefault()}>
           <div className="ml-1">
-            <div className="mt-4 grid grid-cols-1 lg:grid-cols-6 items-center lg:py-3 lg:border-b border-border gap-4">
+            <div className="mt-4 grid grid-cols-1 lg:grid-cols-5 items-center lg:py-3 lg:border-b border-border gap-4">
               <ListHeading className="hidden lg:flex">Projectnaam</ListHeading>
               <ListHeading className="hidden lg:flex">Gebruiker ID</ListHeading>
-              <ListHeading className="hidden lg:flex">Weergavenaam</ListHeading>
               <ListHeading className="hidden lg:flex">Rol</ListHeading>
               <ListHeading className="hidden lg:flex">
                 E-mail notificaties toestemming
@@ -276,22 +225,10 @@ export default function CreateUserProjects() {
                 return (
                   <li
                     key={project.id}
-                    className="grid grid-cols-1 lg:grid-cols-6 items-center py-3 h-fit hover:bg-secondary-background hover:cursor-pointer border-b border-border gap-4">
+                    className="grid grid-cols-1 lg:grid-cols-5 items-center py-3 h-fit hover:bg-secondary-background hover:cursor-pointer border-b border-border gap-4">
                     <Paragraph className="truncate">{project.name}</Paragraph>
                     <Paragraph className="truncate text-muted-foreground">
                       {user?.id ?? '—'}
-                    </Paragraph>
-                    <Paragraph className="truncate mr-4">
-                      {!!effectiveRole && (
-                        <Input
-                          type="text"
-                          defaultValue={user?.projectDisplayName || ''}
-                          placeholder="Weergavenaam"
-                          onChange={(e) => {
-                            addProjectDisplayName(project.id, e.target.value);
-                          }}
-                        />
-                      )}
                     </Paragraph>
                     <Paragraph className="truncate mr-4">
                       <UserRoleDropdownList
