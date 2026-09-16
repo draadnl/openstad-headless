@@ -61,9 +61,14 @@ export function NotificationSettings({ scope }: Props) {
 
   // One place decides which styling this page's mails are rendered with, so the forms do
   // not each repeat the fallback. A project inherits the global brand per field.
-  const effectiveStyling: NotificationStyling = globalScope
+  const savedStyling: NotificationStyling = globalScope
     ? globalStyling || {}
     : resolveInheritedStyling(projectData?.emailConfig?.styling, globalStyling);
+
+  // Unsaved edits in the styling form, so the previews below follow a colour change right
+  // away instead of only after the save has come back.
+  const [liveStyling, setLiveStyling] = React.useState<NotificationStyling>();
+  const effectiveStyling = liveStyling || savedStyling;
 
   // One list per type: a type without a row shows an empty form to create it.
   const templatesByType = React.useMemo(() => {
@@ -131,7 +136,10 @@ export function NotificationSettings({ scope }: Props) {
           />
         </div>
 
-        <NotificationStylingForm scope={scope} />
+        <NotificationStylingForm
+          scope={scope}
+          onStylingChange={setLiveStyling}
+        />
       </div>
 
       {Object.entries(templatesByType).map(([type, templateList], index) => (

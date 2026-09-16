@@ -79,9 +79,14 @@ type Props = {
   // Which templates the colour change regenerates, and where the styling is stored.
   // Defaults to the project of the current route.
   scope?: NotificationScope;
+  /**
+   * Fires on every edit, so the mail previews next to this form can show the
+   * new brand style before it is saved.
+   */
+  onStylingChange?: (styling: NotificationStyling) => void;
 };
 
-export function NotificationStylingForm({ scope }: Props) {
+export function NotificationStylingForm({ scope, onStylingChange }: Props) {
   const router = useRouter();
   const project = router.query.project as string;
   const activeScope = scope || projectNotificationScope(project);
@@ -154,6 +159,20 @@ export function NotificationStylingForm({ scope }: Props) {
   useEffect(() => {
     form.reset(defaults());
   }, [form, defaults]);
+
+  useEffect(() => {
+    if (!onStylingChange) return;
+    const subscription = form.watch((values) => {
+      onStylingChange({
+        logo: values.logo || '',
+        primaryColor: values.primaryColor || DEFAULT_STYLING.primaryColor,
+        backgroundColor:
+          values.backgroundColor || DEFAULT_STYLING.backgroundColor,
+        textColor: values.textColor || DEFAULT_STYLING.textColor,
+      });
+    });
+    return () => subscription.unsubscribe();
+  }, [form, onStylingChange]);
 
   /**
    * The colours live inside the stored MJML, so an existing template keeps its

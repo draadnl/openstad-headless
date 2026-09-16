@@ -1,18 +1,13 @@
 import { fetchSessionUser } from '@/auth-context';
 import { CopyableVar } from '@/components/copyable-var';
+import { ConfirmActionDialog } from '@/components/dialog-confirm-action';
 import AccordionUI from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -431,10 +426,6 @@ export function NotificationForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fieldValue]);
 
-  const [isRestoreDialogOpen, setIsRestoreDialogOpen] = useState(false);
-  const [isSwitchDialogOpen, setIsSwitchDialogOpen] = useState(false);
-  const [isManualDialogOpen, setIsManualDialogOpen] = useState(false);
-
   function handleRestoreDefault() {
     if (!defaultTemplate) return;
     const managed = hasContent(defaultTemplate.content);
@@ -453,7 +444,6 @@ export function NotificationForm({
     });
     setContentManaged(managed);
     setActiveTab(managed ? 'content' : 'html');
-    setIsRestoreDialogOpen(false);
   }
 
   function handleSwitchToContent() {
@@ -468,13 +458,11 @@ export function NotificationForm({
       { keepDirtyValues: false }
     );
     setContentManaged(true);
-    setIsSwitchDialogOpen(false);
     setActiveTab('content');
   }
 
   function handleSwitchToManual() {
     setContentManaged(false);
-    setIsManualDialogOpen(false);
     setActiveTab('html');
   }
 
@@ -567,12 +555,18 @@ export function NotificationForm({
                         {plainText ? 'tekst' : 'HTML'} beheerd. De velden
                         hieronder worden pas gebruikt als je overstapt.
                       </p>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setIsSwitchDialogOpen(true)}>
-                        Overstappen op inhoudsvelden
-                      </Button>
+                      <ConfirmActionDialog
+                        trigger={
+                          <Button type="button" variant="outline">
+                            Overstappen op inhoudsvelden
+                          </Button>
+                        }
+                        header="Overstappen op inhoudsvelden?"
+                        message={`De ${plainText ? 'tekst' : 'HTML'} van deze e-mail wordt dan opnieuw opgebouwd uit de losse velden. Handmatige aanpassingen in de ${plainText ? 'tekst' : 'HTML'} gaan verloren zodra je opslaat.`}
+                        confirmButtonText="Overstappen"
+                        cancelButtonText="Annuleren"
+                        onConfirmAccepted={handleSwitchToContent}
+                      />
                     </div>
                   )}
                   {plainText && (
@@ -615,6 +609,11 @@ export function NotificationForm({
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>{contentField.label}</FormLabel>
+                          {contentField.description && (
+                            <FormDescription>
+                              {contentField.description}
+                            </FormDescription>
+                          )}
                           <FormControl>
                             {contentField.input === 'textarea' ? (
                               <Textarea rows={5} {...field} />
@@ -662,12 +661,18 @@ export function NotificationForm({
                               gegenereerd uit de inhoudsvelden en is daarom niet
                               te bewerken.
                             </p>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => setIsManualDialogOpen(true)}>
-                              {plainText ? 'Tekst' : 'HTML'} zelf beheren
-                            </Button>
+                            <ConfirmActionDialog
+                              trigger={
+                                <Button type="button" variant="outline">
+                                  {plainText ? 'Tekst' : 'HTML'} zelf beheren
+                                </Button>
+                              }
+                              header={`${plainText ? 'Tekst' : 'HTML'} zelf beheren?`}
+                              message={`De inhoudsvelden sturen deze e-mail dan niet meer aan. Je beheert de ${plainText ? 'tekst' : 'HTML'} vanaf dat moment zelf.`}
+                              confirmButtonText="Zelf beheren"
+                              cancelButtonText="Annuleren"
+                              onConfirmAccepted={handleSwitchToManual}
+                            />
                           </div>
                         )}
                         <FormMessage />
@@ -681,13 +686,21 @@ export function NotificationForm({
                 <Button type="submit" disabled={!!error}>
                   Opslaan
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={!defaultTemplate}
-                  onClick={() => setIsRestoreDialogOpen(true)}>
-                  Herstel standaard
-                </Button>
+                <ConfirmActionDialog
+                  trigger={
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={!defaultTemplate}>
+                      Herstel standaard
+                    </Button>
+                  }
+                  header="Weet je het zeker?"
+                  message="Hiermee vervang je het label, het onderwerp en de inhoud van deze template door de standaardversie. Je eigen wijzigingen gaan verloren zodra je opslaat."
+                  confirmButtonText="Herstel standaard"
+                  cancelButtonText="Annuleren"
+                  onConfirmAccepted={handleRestoreDefault}
+                />
               </div>
               {error && <p className="text-red-500">{error}</p>}
             </form>
@@ -739,106 +752,6 @@ export function NotificationForm({
           </div>
         </Form>
       </div>
-
-      <Dialog
-        open={isRestoreDialogOpen}
-        modal={true}
-        onOpenChange={setIsRestoreDialogOpen}>
-        <DialogContent>
-          <div>
-            <DialogTitle asChild>
-              <Heading size="lg">Weet je het zeker?</Heading>
-            </DialogTitle>
-            <DialogDescription className="mt-3 mb-6 text-sm text-muted-foreground">
-              Hiermee vervang je het label, het onderwerp en de inhoud van deze
-              template door de standaardversie. Je eigen wijzigingen gaan
-              verloren zodra je opslaat.
-            </DialogDescription>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setIsRestoreDialogOpen(false)}>
-                Annuleren
-              </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={handleRestoreDefault}>
-                Herstel standaard
-              </Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={isSwitchDialogOpen}
-        modal={true}
-        onOpenChange={setIsSwitchDialogOpen}>
-        <DialogContent>
-          <div>
-            <DialogTitle asChild>
-              <Heading size="lg">Overstappen op inhoudsvelden?</Heading>
-            </DialogTitle>
-            <DialogDescription className="mt-3 mb-6 text-sm text-muted-foreground">
-              De {plainText ? 'tekst' : 'HTML'} van deze e-mail wordt dan
-              opnieuw opgebouwd uit de losse velden. Handmatige aanpassingen in
-              de {plainText ? 'tekst' : 'HTML'} gaan verloren zodra je opslaat.
-            </DialogDescription>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setIsSwitchDialogOpen(false)}>
-                Annuleren
-              </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={handleSwitchToContent}>
-                Overstappen
-              </Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={isManualDialogOpen}
-        modal={true}
-        onOpenChange={setIsManualDialogOpen}>
-        <DialogContent>
-          <div>
-            <DialogTitle asChild>
-              <Heading size="lg">
-                {plainText ? 'Tekst' : 'HTML'} zelf beheren?
-              </Heading>
-            </DialogTitle>
-            <DialogDescription className="mt-3 mb-6 text-sm text-muted-foreground">
-              De inhoudsvelden sturen deze e-mail dan niet meer aan. Je beheert
-              de {plainText ? 'tekst' : 'HTML'} vanaf dat moment zelf.
-            </DialogDescription>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setIsManualDialogOpen(false)}>
-                Annuleren
-              </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={handleSwitchToManual}>
-                Zelf beheren
-              </Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
