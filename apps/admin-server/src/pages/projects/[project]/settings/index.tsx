@@ -18,13 +18,19 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { PageLayout } from '@/components/ui/page-layout';
+import {
+  rebaselineAfterSave,
+  useRegisterSave,
+} from '@/components/ui/save-controller';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Heading } from '@/components/ui/typography';
+import { useSyncFormDefaults } from '@/hooks/useSyncFormDefaults';
 import { validateProjectNumber } from '@/lib/validateProjectNumber';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as Switch from '@radix-ui/react-switch';
+import cloneDeep from 'lodash/cloneDeep';
 import { useRouter } from 'next/router';
 import * as React from 'react';
 import { useCallback, useEffect, useState } from 'react';
@@ -34,26 +40,46 @@ import * as z from 'zod';
 
 import { useProject } from '../../../../hooks/use-project';
 
-const formSchema = z.object({
-  name: z.string().min(1, {
-    message: 'De naam van een project mag niet leeg zijn!',
-  }),
-  username: z.string().optional(),
-  password: z.string().optional(),
-  endDate: z.date().min(new Date(), {
-    message: 'De datum moet nog niet geweest zijn!',
-  }),
-  // We don't want to restrict this URL too much
-  url: z
-    .string()
-    .regex(/^(?:([a-z0-9.:\-_\/]+))?$/g, {
-      message:
-        'De URL mag alleen kleine letters, cijfers, punten, dubbele punten, koppeltekens, onderstrepingstekens en schuine strepen bevatten.',
-    })
-    .optional(),
-  basicAuthActive: z.coerce.boolean().optional(),
-  projectToggle: z.boolean().optional(),
-});
+const GENERAL_TAB = { tab: 'general', tabLabel: 'Projectinformatie' };
+const FIELD_LABELS: Record<string, string> = {
+  name: 'Projectnaam',
+  endDate: 'Einddatum',
+  url: 'Project URL',
+  basicAuthActive: 'Beveiliging met wachtwoord',
+  password: 'Wachtwoord',
+  projectToggle: 'Website aan/uit',
+};
+
+const formSchema = z
+  .object({
+    name: z.string().min(1, {
+      message: 'De naam van een project mag niet leeg zijn!',
+    }),
+    username: z.string().optional(),
+    password: z.string().optional(),
+    endDate: z.date().min(new Date(), {
+      message: 'De datum moet nog niet geweest zijn!',
+    }),
+    // We don't want to restrict this URL too much
+    url: z
+      .string()
+      .regex(/^(?:([a-z0-9.:\-_\/]+))?$/g, {
+        message:
+          'De URL mag alleen kleine letters, cijfers, punten, dubbele punten, koppeltekens, onderstrepingstekens en schuine strepen bevatten.',
+      })
+      .optional(),
+    basicAuthActive: z.coerce.boolean().optional(),
+    projectToggle: z.boolean().optional(),
+  })
+  .superRefine((values, ctx) => {
+    if (values.basicAuthActive && !values.password?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['password'],
+        message: 'Vul een wachtwoord in om de beveiliging te activeren.',
+      });
+    }
+  });
 
 export default function ProjectSettings() {
   const router = useRouter();
@@ -71,6 +97,7 @@ export default function ProjectSettings() {
   const [basicAuthInitial, setBasicAuthInitial] = useState(true);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('general');
 
   const defaults = useCallback(() => {
     const currentDate = new Date();
@@ -93,11 +120,7 @@ export default function ProjectSettings() {
     defaultValues: defaults(),
   });
 
-  useEffect(() => {
-    form.reset(defaults());
-    // if(basicAuthActive !== data?.config?.basicAuth?.active)
-    //   setBasicAuthActive(data?.config?.basicAuth?.active);
-  }, [form, defaults]);
+  useSyncFormDefaults(form, defaults, data);
 
   useEffect(() => {
     if (!data) return;
@@ -106,7 +129,7 @@ export default function ProjectSettings() {
       const toggle = data?.config?.project?.projectToggle ?? !!data?.url;
       setShowUrl(toggle);
       setCheckboxInitial(false);
-      setProjectHasEnded(data?.config?.project?.projectHasEnded);
+      setProjectHasEnded(!!data?.config?.project?.projectHasEnded);
     }
 
     if (basicAuthInitial) {
@@ -115,53 +138,55 @@ export default function ProjectSettings() {
     }
   }, [data, checkboxInitial, basicAuthInitial, form]);
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
-    try {
-      const project = await updateProject(
-        {
-          project: {
-            endDate: values.endDate,
-            projectToggle: values.projectToggle,
-            lastUrl: values.url || data?.config?.project?.lastUrl || '',
-          },
-          basicAuth: {
-            active: values.basicAuthActive,
-            username: values.username,
-            password: values.password,
-          },
-        },
-        values.name,
-        values.projectToggle ? values.url : ''
-      );
-      if (project?.error) {
-        toast.error(project.error);
-      } else if (project) {
-        toast.success('Project aangepast!');
-      } else {
-        toast.error('Er is helaas iets mis gegaan.');
-      }
-    } catch (error) {
-      console.error('could not update', error);
-      toast.error('Er is helaas iets mis gegaan.');
-    }
-  }
+  const savedProjectHasEnded = !!data?.config?.project?.projectHasEnded;
+  const projectHasEndedDirty = !!projectHasEnded !== savedProjectHasEnded;
 
-  async function saveProjectHasEnded(value: boolean) {
-    try {
-      const project = await updateProject({
-        project: {
-          projectHasEnded: value,
-        },
-      });
-      if (project) {
-        toast.success('Project aangepast!');
-      } else {
-        toast.error('Er is helaas iets mis gegaan.');
+  const save = useCallback(async () => {
+    const valid = await form.trigger();
+    if (!valid) {
+      const firstErrorField = Object.keys(form.formState.errors)[0];
+      const label = firstErrorField ? FIELD_LABELS[firstErrorField] : undefined;
+      if (label) {
+        setActiveTab(GENERAL_TAB.tab);
+        throw new Error(
+          `Controleer het veld "${label}" op het tabblad "${GENERAL_TAB.tabLabel}".`
+        );
       }
-    } catch (error) {
-      console.error('could not update', error);
+      throw new Error('Controleer de gemarkeerde velden.');
     }
-  }
+    const values = formSchema.parse(form.getValues());
+    const sent = cloneDeep(form.getValues());
+    const result = await updateProject(
+      {
+        project: {
+          endDate: values.endDate,
+          projectToggle: values.projectToggle,
+          lastUrl: values.url || data?.config?.project?.lastUrl || '',
+          projectHasEnded: !!projectHasEnded,
+        },
+        basicAuth: {
+          active: values.basicAuthActive,
+          username: values.username,
+          password: values.password,
+        },
+      },
+      values.name,
+      values.projectToggle ? values.url : ''
+    );
+    if (!result) {
+      throw new Error('Er is helaas iets mis gegaan.');
+    }
+
+    rebaselineAfterSave(form, sent);
+  }, [form, updateProject, data, projectHasEnded]);
+
+  // The "Project beeindigen" toggle lives outside the form, so its dirty state
+  // is tracked separately and folded into the same save.
+  useRegisterSave({
+    isDirty: form.formState.isDirty || projectHasEndedDirty,
+    save,
+  });
+
   async function archiveProject() {
     if (!data?.config?.project?.projectHasEnded) {
       toast.error(
@@ -243,7 +268,7 @@ export default function ProjectSettings() {
           },
         ]}>
         <div className="container py-6">
-          <Tabs defaultValue="general">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="w-full bg-white border-b-0 mb-4 rounded-md">
               <TabsTrigger value="general">Projectinformatie</TabsTrigger>
               <TabsTrigger value="csp">Beveiligingsheaders</TabsTrigger>
@@ -257,9 +282,7 @@ export default function ProjectSettings() {
                 <Form {...form}>
                   <Heading size="xl">Projectinformatie</Heading>
                   <Separator className="my-4" />
-                  <form
-                    onSubmit={form.handleSubmit(onSubmit)}
-                    className="grid grid-cols-2 gap-x-4 gap-y-8">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-8">
                     <FormField
                       control={form.control}
                       name="name"
@@ -386,10 +409,7 @@ export default function ProjectSettings() {
                         />
                       </>
                     ) : null}
-                    <Button className="w-fit col-span-full" type="submit">
-                      Opslaan
-                    </Button>
-                  </form>
+                  </div>
                 </Form>
               </div>
             </TabsContent>
@@ -538,11 +558,6 @@ export default function ProjectSettings() {
                       <Switch.Thumb className="block w-[21px] h-[21px] bg-white rounded-full transition-transform duration-100 translate-x-0.5 will-change-transform data-[state=checked]:translate-x-[27px]" />
                     </Switch.Root>
                   </div>
-                  <Button
-                    className="mt-4 w-fit"
-                    onClick={() => saveProjectHasEnded(projectHasEnded)}>
-                    Opslaan
-                  </Button>
                 </div>
               </div>
             </TabsContent>

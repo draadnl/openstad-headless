@@ -411,18 +411,21 @@ export default function WidgetResourceFormItems(
   });
 
   const itemsInitialized = React.useRef(false);
+  const syncedItemsRef = React.useRef<string>(JSON.stringify(items));
   useEffect(() => {
     if (props?.items && props?.items?.length > 0 && !itemsInitialized.current) {
       itemsInitialized.current = true;
-      setItems(props.items.map(withId));
+      const seeded = props.items.map(withId);
+      syncedItemsRef.current = JSON.stringify(seeded);
+      setItems(seeded);
     }
   }, [props?.items]);
 
   const { onFieldChanged } = props;
   useEffect(() => {
-    if (onFieldChanged) {
-      onFieldChanged('items', items);
-    }
+    if (!onFieldChanged) return;
+    if (JSON.stringify(items) === syncedItemsRef.current) return;
+    onFieldChanged('items', items);
   }, [items]);
 
   // Sets form to selected item values when item is selected
@@ -606,20 +609,6 @@ export default function WidgetResourceFormItems(
     return sorted;
   }
 
-  function handleSaveItems() {
-    const updatedProps = { ...props };
-
-    Object.keys(updatedProps).forEach((key: string) => {
-      if (key.startsWith('options.')) {
-        // @ts-ignore
-        delete updatedProps[key];
-      }
-    });
-
-    props.updateConfig({ ...updatedProps, items });
-    setMatrixOptions(matrixDefault);
-  }
-
   const hasOptions = () => {
     switch (form.watch('type')) {
       case 'checkbox':
@@ -796,14 +785,6 @@ export default function WidgetResourceFormItems(
                         ))
                     : 'Geen items'}
                 </div>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  className="w-fit mt-4"
-                  type="button"
-                  onClick={() => handleSaveItems()}>
-                  Configuratie opslaan
-                </Button>
               </div>
             </div>
 
