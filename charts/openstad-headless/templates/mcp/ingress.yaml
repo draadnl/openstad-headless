@@ -1,0 +1,68 @@
+---
+{{- if .Values.mcp.ingress.enabled -}}
+{{ $serviceName := include "openstad.mcp.fullname" . }}
+{{ $servicePort := .Values.mcp.service.httpPort }}
+{{ $tls := .Values.mcp.ingress.tls }}
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+
+metadata:
+
+  annotations:
+    {{- if .Values.clusterIssuer.enabled }}
+    cert-manager.io/cluster-issuer: {{ template "openstad.clusterIssuer.name" . }}
+    {{- end }}
+    {{- if eq (include "openstad.ingress.type" .) "traefik" }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ include "openstad.traefik.middlewares.mcp" . }}
+    {{- else }}
+    {{- with .Values.mcp.ingress.annotations }}
+{{ toYaml . | indent 4 }}
+    {{- end }}
+    {{- end }}
+
+  labels:
+  {{- include "openstad.labels" . | nindent 4 }}
+    app.kubernetes.io/component: {{ template "openstad.mcp.fullname" . }}-ingress
+{{- range $key, $value := .Values.mcp.ingress.extraLabels }}
+  {{ $key }}: {{ $value }}
+{{- end }}
+
+  name: {{ template "openstad.mcp.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+
+spec:
+  ingressClassName: {{ .Values.mcp.ingress.ingressClassName | default (include "openstad.ingress.type" .) }}
+  rules:
+{{- range $host := .Values.mcp.ingress.hosts }}
+    - host: {{ $host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $serviceName }}
+                port:
+                  number: {{ $servicePort }}
+{{- end }}
+    - host: {{ template "openstad.mcp.url" . }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $serviceName }}
+                port:
+                  number: {{ $servicePort }}
+
+  tls:
+    - secretName: {{ .Values.mcp.ingress.tls.secretName }}
+      hosts:
+        - {{ template "openstad.mcp.url" . }}
+        {{- range $value := .Values.mcp.ingress.tls.hosts }}
+        {{ printf "- %s" $value | nindent 8 }}
+        {{- end }}
+
+{{- end -}}

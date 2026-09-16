@@ -68,3 +68,17 @@ image:
     - node
     - server.js
   customWorkingDir: /opt/openstad-headless/apps/image-server
+
+mcp:
+  extraEnvVars:
+    - name: NODE_OPTIONS
+      value: '--max-old-space-size=64 --max-semi-space-size=8'
+  resources:
+    limits:
+      memory: 128Mi
+    requests:
+      memory: 128Mi
+  customCommand:
+    - node
+    - server.js
+  customWorkingDir: /opt/openstad-headless/apps/mcp-server

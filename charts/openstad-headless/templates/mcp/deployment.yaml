@@ -1,0 +1,64 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "openstad.mcp.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openstad.labels" . | nindent 4 }}
+    app.kubernetes.io/component: {{ template "openstad.mcp.fullname" . }}-deployment
+spec:
+  replicas: {{ .Values.mcp.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ .Values.mcp.label }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.mcp.label }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+      - name: {{ template "openstad.mcp.fullname" . }}
+        image: {{ .Values.mcp.deploymentContainer.image }}
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+        ports:
+          - containerPort: {{ .Values.mcp.service.httpPort }}
+            name: http
+        env:
+          - name: MCP_HOST
+            value: "0.0.0.0"
+          - name: MCP_PORT
+            value: "{{ .Values.mcp.service.httpPort }}"
+          - name: MCP_REPORTING_API_BASE_URL
+            value: http://{{ printf "%s.%s.svc.cluster.local:%d" (include "openstad.api.fullname" .) .Release.Namespace (.Values.api.service.httpPort | int) }}
+          - name: MCP_ALLOWED_HOSTS
+            value: {{ concat (list (include "openstad.mcp.url" .)) (.Values.mcp.ingress.hosts | default list) (list "localhost" "127.0.0.1") | uniq | join "," | quote }}
+          # Inject extra environment variables
+          {{- if .Values.mcp.extraEnvVars }}
+          {{- include "common.tplvalues.render" (dict "value" .Values.mcp.extraEnvVars "context" $) | nindent 10 }}
+          {{- end }}
+        resources:
+{{ toYaml .Values.mcp.resources | indent 12 }}
+        volumeMounts:
+          - mountPath: /tmp
+            name: tmp-dir
+        readinessProbe:
+          tcpSocket:
+            port: {{ .Values.mcp.service.httpPort }}
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        livenessProbe:
+          tcpSocket:
+            port: {{ .Values.mcp.service.httpPort }}
+          initialDelaySeconds: {{ .Values.mcp.probe.liveness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.mcp.probe.liveness.periodSeconds }}
+      volumes:
+        - name: tmp-dir
+          emptyDir: {}

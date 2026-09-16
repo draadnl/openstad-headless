@@ -496,6 +496,59 @@ cms:
     importExport:
       mountPath: /opt/openstad-headless/apps/cms-server/public/uploads/import-export
   disableRateLimiter: "false" # Whether to disable the rate limiter for this service
+mcp:
+  # Configure how many replicas exists of this service.
+  # The MCP transport is session-based (Mcp-Session-Id); keep this on 1 unless
+  # sessionAffinity is added to the Service, otherwise sessions can break across replicas.
+  replicas: 1
+  # Configure how the service is named and labeled
+  name: 'mcp'
+  label: openstad-mcp-service
+  # Service settings:
+  # Primarily port configuration
+  service:
+    httpPort: 3900
+  # Deployment container is what is eventually run in the pod
+  deploymentContainer:
+    name: mcp
+    # Docker image for this pod
+    image: ghcr.io/openstad/mcp-server:latest
+  # Subdomain for the service:
+  # If filled it it will create a default url of: www.$subdomain.$baseurl
+  # If not filled in the base will be used instead: www.$baseurl
+  subdomain: reporting-mcp
+  # Ingress settings:
+  # Configure how the service is accessed.
+  # Deliberately disabled by default (unlike other services): public exposure is
+  # opt-in per environment, otherwise acc's prod ClusterIssuer fires a production
+  # ACME order for a hostname with no DNS record.
+  ingress:
+    enabled: false # Whether there is a ingress for this service
+    annotations: {}
+    extraLabels: {}
+    hosts: []
+    ingressClassName:  # defaults to global.ingress.type
+    tls:
+      secretName: openstad-tls-mcp
+      hosts: []
+  # Inject extra environment variables
+  extraEnvVars: []
+  # Resources:
+  resources:
+    # Max resources
+    limits:
+      memory: 256M
+    # Min resources
+    requests:
+      cpu: 50m
+      memory: 128M
+  # Check whether the service is healthy:
+  # First time after $(initialDelaySeconds) seconds.
+  # After that every $(periodSeconds) seconds
+  probe:
+    liveness:
+      initialDelaySeconds: 15
+      periodSeconds: 30
 # Overwrite Secrets
 
 ##

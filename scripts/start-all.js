@@ -1,5 +1,10 @@
 const execute = require('./execute');
 
+// mcp-server (and cms-server) are intentionally not started here: this script
+// covers the non-Docker local dev path, while mcp-server is Docker/Helm-only
+// (see apps/mcp-server/README.md). Use `docker compose up openstad-mcp-server`
+// or `./scripts/build.sh openstad-mcp-server` instead.
+
 async function start() {
   console.log('==============================');
 
