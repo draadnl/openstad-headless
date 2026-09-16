@@ -36,6 +36,11 @@ import {
   showsLogo,
 } from '@/lib/notification-content';
 import {
+  NotificationScope,
+  isGlobalScope,
+  projectNotificationScope,
+} from '@/lib/notification-scope';
+import {
   buildPreviewContext,
   variablesForType,
 } from '@/lib/notification-variables';
@@ -68,8 +73,12 @@ type Props = {
   subject?: string;
   body?: string;
   content?: NotificationContent | null;
-  /** Unsaved brand style from the styling form, so the preview follows it. */
-  stylingOverride?: NotificationStyling;
+  // Which template collection to write to. Defaults to the project of the current route.
+  scope?: NotificationScope;
+  // The mail styling the MJML is rendered with. NotificationSettings passes the resolved
+  // one (project value with the global settings as fallback); left out, the form falls back
+  // to the project of the current route, for the standalone use in settings/users.tsx.
+  styling?: NotificationStyling;
 };
 
 const formSchema = z.object({
@@ -137,16 +146,22 @@ export function NotificationForm({
   subject,
   body,
   content,
-  stylingOverride,
+  scope,
+  styling: stylingProp,
 }: Props) {
   const router = useRouter();
-  const project = router.query.project as string;
-  const { create, update } = useNotificationTemplate(project as string);
-  const { data: defaultTemplates } = useNotificationTemplateDefaults(
-    project as string
-  );
+  // Without a scope prop the form belongs to the project of the current route, which is
+  // how it is used on the project pages.
+  const activeScope =
+    scope || projectNotificationScope(router.query.project as string);
+  const globalScope = isGlobalScope(activeScope);
+  const { create, update } = useNotificationTemplate(activeScope);
+  const { data: defaultTemplates } =
+    useNotificationTemplateDefaults(activeScope);
   const defaultTemplate = defaultTemplates?.find((d) => d.type === type);
   const notificationTitle = NOTIFICATION_TYPE_LABELS[type];
+  // On a project page this resolves through the route; on the global settings page there
+  // is no project in the route, so the hook fetches nothing and `styling` is passed in.
   const { data: projectData } = useProject();
   const plainText = isPlainTextType(type);
   const fixedBlockNotice = FIXED_BLOCKS_BY_TYPE[type];
@@ -175,11 +190,23 @@ export function NotificationForm({
     setUserNameInPreview();
   }, []);
 
+  // In global scope the preview keeps the neutral sample project from
+  // buildPreviewContext: there is no single project this template belongs to.
   useEffect(() => {
+    if (globalScope) {
+      setPreviewOverrides((prev) => ({
+        ...prev,
+        logo: stylingProp?.logo || prev.logo,
+      }));
+      return;
+    }
     if (!projectData) return;
     setPreviewOverrides((prev) => ({
       ...prev,
-      logo: projectData.emailConfig?.styling?.logo || prev.logo,
+      logo:
+        stylingProp?.logo ||
+        projectData.emailConfig?.styling?.logo ||
+        prev.logo,
       projectName: projectData.title || projectData.name || prev.projectName,
       projectUrl: projectData.url || prev.projectUrl,
       project: {
@@ -188,14 +215,17 @@ export function NotificationForm({
         url: projectData.url || '',
       },
     }));
-  }, [projectData]);
+  }, [projectData, globalScope, stylingProp?.logo]);
 
   const mailContext = useMemo(
     () => buildPreviewContext(type, previewOverrides),
     [type, previewOverrides]
   );
 
-  const styling = stylingOverride || projectData?.emailConfig?.styling || {};
+  // The passed styling wins: in global scope it is the only source, and on a project page
+  // it is not passed at all.
+  const styling: NotificationStyling =
+    stylingProp || projectData?.emailConfig?.styling || {};
 
   const defaultValueBody = body || defaultTemplate?.body || '';
   const defaultContent = useMemo(
@@ -315,15 +345,14 @@ export function NotificationForm({
         toast.error('Er is helaas iets mis gegaan.');
       }
     } else {
-      const template = await create(
-        project,
-        values.engine,
+      const template = await create({
+        engine: values.engine,
         type,
-        values.label,
-        values.subject,
-        values.body,
-        contentToSave
-      );
+        label: values.label,
+        subject: values.subject,
+        body: values.body,
+        content: contentToSave,
+      });
       if (template) {
         toast.success('Template aangemaakt!');
       } else {
