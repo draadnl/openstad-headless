@@ -67,7 +67,15 @@ function logoName(url: string): string {
   return withoutQuery.split('/').pop() || url;
 }
 
-export function NotificationStylingForm() {
+type Props = {
+  /**
+   * Fires on every edit, so the mail previews next to this form can show the
+   * new brand style before it is saved.
+   */
+  onStylingChange?: (styling: NotificationStyling) => void;
+};
+
+export function NotificationStylingForm({ onStylingChange }: Props) {
   const router = useRouter();
   const project = router.query.project as string;
   const { data: projectData, updateProjectEmails } = useProject([
@@ -118,6 +126,20 @@ export function NotificationStylingForm() {
   useEffect(() => {
     form.reset(defaults());
   }, [form, defaults]);
+
+  useEffect(() => {
+    if (!onStylingChange) return;
+    const subscription = form.watch((values) => {
+      onStylingChange({
+        logo: values.logo || '',
+        primaryColor: values.primaryColor || DEFAULT_STYLING.primaryColor,
+        backgroundColor:
+          values.backgroundColor || DEFAULT_STYLING.backgroundColor,
+        textColor: values.textColor || DEFAULT_STYLING.textColor,
+      });
+    });
+    return () => subscription.unsubscribe();
+  }, [form, onStylingChange]);
 
   /**
    * The colours live inside the stored MJML, so an existing template keeps its

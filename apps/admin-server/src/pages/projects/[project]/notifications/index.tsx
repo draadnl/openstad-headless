@@ -4,6 +4,7 @@ import AccordionUI from '@/components/ui/accordion';
 import { PageLayout } from '@/components/ui/page-layout';
 import { Separator } from '@/components/ui/separator';
 import useNotificationTemplate from '@/hooks/use-notification-template';
+import { NotificationStyling } from '@/lib/notification-content';
 import { useRouter } from 'next/router';
 import * as React from 'react';
 
@@ -38,6 +39,10 @@ export default function ProjectNotifications() {
 
   const router = useRouter();
   const project = router.query.project as string;
+
+  // Unsaved brand style, so every preview below follows the styling form live.
+  const [livePreviewStyling, setLivePreviewStyling] =
+    React.useState<NotificationStyling>();
   const { data } = useNotificationTemplate(project as string);
   const mjmlText = `<mjml>
                   <mj-body>
@@ -125,7 +130,9 @@ export default function ProjectNotifications() {
                 />
               </div>
 
-              <NotificationStylingForm />
+              <NotificationStylingForm
+                onStylingChange={setLivePreviewStyling}
+              />
             </div>
 
             {Object.entries(typeDefinitions).map(
@@ -133,7 +140,10 @@ export default function ProjectNotifications() {
                 <React.Fragment key={index}>
                   {templateList.length === 0 && (
                     <div key={type}>
-                      <NotificationForm type={type as NotificationType} />
+                      <NotificationForm
+                        type={type as NotificationType}
+                        stylingOverride={livePreviewStyling}
+                      />
                       {index !== Object.entries(typeDefinitions).length - 1 && (
                         <Separator />
                       )}
@@ -149,6 +159,7 @@ export default function ProjectNotifications() {
                         subject={template.subject}
                         body={template.body}
                         content={template.content}
+                        stylingOverride={livePreviewStyling}
                       />
                     </div>
                   ))}

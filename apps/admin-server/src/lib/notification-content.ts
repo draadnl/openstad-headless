@@ -32,14 +32,11 @@ export type NotificationContent = {
 
 export type NotificationContentField = {
   key:
-    | 'heading'
-    | 'greeting'
-    | 'intro'
-    | 'buttonLabel'
-    | 'buttonUrl'
-    | 'footer';
+    'heading' | 'greeting' | 'intro' | 'buttonLabel' | 'buttonUrl' | 'footer';
   label: string;
   input: 'text' | 'textarea';
+  /** Short help text under the label, for fields whose effect is not obvious. */
+  description?: string;
 };
 
 // Keep in sync with CONTENT_KEYS in
@@ -49,8 +46,20 @@ export const NOTIFICATION_CONTENT_FIELDS: NotificationContentField[] = [
   { key: 'heading', label: 'Titel', input: 'text' },
   { key: 'greeting', label: 'Aanhef', input: 'text' },
   { key: 'intro', label: 'Tekst', input: 'textarea' },
-  { key: 'buttonLabel', label: 'Knoptekst', input: 'text' },
-  { key: 'buttonUrl', label: 'Knoplink', input: 'text' },
+  {
+    key: 'buttonLabel',
+    label: 'Knoptekst',
+    input: 'text',
+    description:
+      'De tekst op de knop. Laat dit veld of de knoplink leeg om de knop weg te laten.',
+  },
+  {
+    key: 'buttonUrl',
+    label: 'Knoplink',
+    input: 'text',
+    description:
+      'De bestemming van de knop hierboven. Een variabele zoals {{loginurl}} wordt bij het versturen vervangen door de echte link van de ontvanger.',
+  },
   { key: 'footer', label: 'Afsluiting', input: 'textarea' },
 ];
 
