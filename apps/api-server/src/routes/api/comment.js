@@ -320,15 +320,16 @@ router
 
         if (!notificationType) throw new Error('No valid notification type');
 
-        db.Notification.create({
+        const notification = await db.Notification.create({
           type: notificationType,
           projectId: req.project.id,
           to: receiver,
           data: commentData,
         });
-        confirmationSent = true;
+        confirmationSent = notification.status === 'sent' ? true : undefined;
       } catch (e) {
         console.log('Error sending notification email for comment:', e);
+        confirmationSent = undefined;
       }
     }
 

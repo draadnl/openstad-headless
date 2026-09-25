@@ -1,6 +1,5 @@
-const db = require('../db');
-
-module.exports = async function processQueuedNotifications() {
+module.exports = async function processQueuedNotifications(database) {
+  const db = database || require('../db');
   try {
     let queuedNotifications = await db.Notification.scope().findAll({
       where: { status: 'queued' },
@@ -44,22 +43,31 @@ module.exports = async function processQueuedNotifications() {
 
             let instance = target[0]; // ignore other multiple fields like subject
 
-            let message = await db.NotificationMessage.create(
-              {
-                projectId: instance.projectId,
-                engine: instance.engine,
-                type: instance.type,
-                from: instance.from,
-                to: instance.to,
-              },
-              {
-                data,
+            // One failing target must not block the others; it stays queued
+            // and is retried on the next run.
+            try {
+              let message = await db.NotificationMessage.create(
+                {
+                  projectId: instance.projectId,
+                  engine: instance.engine,
+                  type: instance.type,
+                  from: instance.from,
+                  to: instance.to,
+                },
+                {
+                  data,
+                }
+              );
+              await message.send();
+              await instance.update({ status: 'sent' });
+              for (let entry of target) {
+                await entry.update({ status: 'sent' });
               }
-            );
-            await message.send();
-            await instance.update({ status: 'sent' });
-            for (let entry of target) {
-              await entry.update({ status: 'sent' });
+            } catch (err) {
+              console.error(
+                `Queued notifications ${target.map((entry) => entry.id).join(', ')} (type: ${type}, projectId: ${projectId}) failed to send:`,
+                err
+              );
             }
           }
         }
