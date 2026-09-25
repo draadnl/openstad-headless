@@ -17,7 +17,8 @@ export default function ProjectNotifications() {
     | 'new enquete - admin'
     | 'new enquete - user'
     | 'notification comment - user'
-    | 'notification comment reply - user';
+    | 'notification comment reply - user'
+    | 'new modbreak - user feedback';
 
   const defaultDefinitions: { [type in NotificationType]: any[] } = {
     'login email': [],
@@ -30,6 +31,7 @@ export default function ProjectNotifications() {
     'new enquete - user': [],
     'notification comment - user': [],
     'notification comment reply - user': [],
+    'new modbreak - user feedback': [],
   };
 
   const [typeDefinitions, setTypeDefinitions] =
@@ -155,6 +157,29 @@ export default function ProjectNotifications() {
                           -modBreaks
                           <br />
                           -publishDateHumanized
+                        </p>
+                        <br />
+                        <p>
+                          newModBreaks (lijst met nieuw geplaatste modbreaks, te
+                          gebruiken met &#123;% for mb in newModBreaks %&#125;):
+                          <br />
+                          -description
+                          <br />
+                          -authorName
+                          <br />
+                          -modBreakDate
+                        </p>
+                        <br />
+                        <p>
+                          changedModBreaks (lijst met aangepaste modbreaks, te
+                          gebruiken met &#123;% for mb in changedModBreaks
+                          %&#125;):
+                          <br />
+                          -description
+                          <br />
+                          -authorName
+                          <br />
+                          -modBreakDate
                         </p>
                         <br />
                         <p>
