@@ -139,6 +139,23 @@ export const InitializeFormFields = (items, data) => {
         case 'imageUpload':
           fieldData['allowedTypes'] = item.allowedTypes || ['image/*'];
           fieldData['maxUploadSizeMB'] = item.maxUploadSizeMB ?? 25;
+          fieldData['allowImageDescription'] =
+            item.allowImageDescription ?? false;
+          fieldData['imageDescriptionLabel'] =
+            item.imageDescriptionLabel || 'Opmerking bij deze afbeelding';
+          break;
+        case 'images':
+          // The default image field has type 'images' with fieldType
+          // 'imageUpload' (see default-values.tsx), so it never matches the
+          // 'imageUpload' case above. Only forward the new description
+          // toggle here -- NOT allowedTypes/maxUploadSizeMB, which were
+          // never wired for this type and would silently change upload
+          // limits for existing projects that rely on the component's own
+          // defaults if added now.
+          fieldData['allowImageDescription'] =
+            item.allowImageDescription ?? false;
+          fieldData['imageDescriptionLabel'] =
+            item.imageDescriptionLabel || 'Opmerking bij deze afbeelding';
           break;
         case 'documentUpload':
           fieldData['maxUploadSizeMB'] = item.maxUploadSizeMB ?? 25;
