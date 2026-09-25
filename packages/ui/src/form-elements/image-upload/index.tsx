@@ -8,6 +8,7 @@ import {
   FormFieldDescription,
   FormLabel,
   Paragraph,
+  Textbox,
 } from '@utrecht/component-library-react';
 import {
   FilePondErrorDescription,
@@ -26,6 +27,14 @@ import { InfoImage } from '../../infoImage';
 import RteContent from '../../rte-formatting/rte-content';
 import { Spacer } from '../../spacer';
 import './image-upload.css';
+import {
+  MockImageFile,
+  buildImageValue,
+  removeDescription,
+  toDescriptionEntries,
+  toMockImages,
+  toUploadedImageName,
+} from './value';
 
 registerPlugin(
   FilePondPluginImageExifOrientation,
@@ -65,18 +74,6 @@ const filePondSettings = {
   maxParallelUploads: 1,
 };
 
-type MockImageFile = {
-  source: string;
-  options: {
-    type: string;
-    file: {
-      name: string;
-      size: number;
-      type: string;
-    };
-  };
-};
-
 export type ImageUploadProps = {
   title: string;
   overrideDefaultValue?: FormValue;
@@ -88,11 +85,17 @@ export type ImageUploadProps = {
   disabled?: boolean;
   multiple?: boolean;
   maxUploadSizeMB?: number;
+  // Lets the submitter add a remark to their own uploaded image (e.g. "this
+  // image is AI-generated"), reusing the same `images[].description` field
+  // an admin already fills in from the back office.
+  allowImageDescription?: boolean;
+  imageDescriptionLabel?: string;
+  imageDescriptionMaxLength?: number;
   type?: string;
   onChange?: (
     e: {
       name: string;
-      value: { name: string; url: string }[];
+      value: { name: string; url: string; description?: string }[];
       isInitial?: boolean;
     },
     triggerSetLastKey?: boolean
@@ -137,6 +140,9 @@ const ImageUploadField: FC<ImageUploadProps> = ({
   images = [],
   createImageSlider = false,
   imageClickable = false,
+  allowImageDescription = false,
+  imageDescriptionLabel = 'Opmerking bij deze afbeelding',
+  imageDescriptionMaxLength = 500,
   ...props
 }) => {
   const datastore = new DataStore(props);
@@ -148,30 +154,24 @@ const ImageUploadField: FC<ImageUploadProps> = ({
   const notifyFailed = (message: string) =>
     NotificationService.addNotification(message, 'error');
 
-  const initialValue: MockImageFile[] =
-    overrideDefaultValue && Array.isArray(overrideDefaultValue)
-      ? (overrideDefaultValue as { url: string; name: string }[]).map(
-          (item: { url: string; name: string }) => {
-            return {
-              source: item.url,
-              options: {
-                type: 'local',
-                file: {
-                  name: item.name,
-                  size: 1,
-                  type: '*',
-                },
-              },
-            };
-          }
-        )
-      : [];
+  const initialValue: MockImageFile[] = toMockImages(overrideDefaultValue);
 
   const [files, setImages] = useState<FilePondFile[]>([]);
   const [mockImages, setMockImages] = useState<MockImageFile[]>(initialValue);
   const [uploadedImages, setUploadedImages] = useState<
     { name: string; url: string }[]
   >([]);
+
+  // Prefill remarks already saved on this resource (e.g. one an admin wrote),
+  // keyed by image url so the submitter sees them and can edit or clear them.
+  const initialDescriptions: Record<string, string> = {};
+  for (const mockImage of initialValue) {
+    if (mockImage.description !== undefined) {
+      initialDescriptions[mockImage.source] = mockImage.description;
+    }
+  }
+  const [descriptions, setDescriptions] =
+    useState<Record<string, string>>(initialDescriptions);
 
   class HtmlContent extends React.Component<{ html: any }> {
     render() {
@@ -182,11 +182,11 @@ const ImageUploadField: FC<ImageUploadProps> = ({
 
   const didInitRef = useRef(false);
   useEffect(() => {
-    const images = [...uploadedImages];
-    for (let i = 0; i < mockImages.length; i++) {
-      const mockImage = mockImages[i];
-      images.push({ name: mockImage.options.file.name, url: mockImage.source });
-    }
+    const images = buildImageValue({
+      uploadedImages,
+      mockImages,
+      descriptions,
+    });
 
     if (onChange) {
       onChange({
@@ -197,7 +197,15 @@ const ImageUploadField: FC<ImageUploadProps> = ({
       });
     }
     didInitRef.current = true;
-  }, [uploadedImages.length, mockImages.length, setImages, setUploadedImages]);
+    // `descriptions` is included so typing a remark (which changes no
+    // array length) also re-emits the value -- lengths alone would miss it.
+  }, [
+    uploadedImages.length,
+    mockImages.length,
+    descriptions,
+    setImages,
+    setUploadedImages,
+  ]);
 
   const acceptAttribute = allowedTypes ? allowedTypes : '';
 
@@ -231,6 +239,11 @@ const ImageUploadField: FC<ImageUploadProps> = ({
   }, []);
 
   const finalImages = Array.from(new Set([...mockImages, ...files]));
+
+  // Display order for the remark boxes -- see toDescriptionEntries in
+  // value.ts for how this was measured against FilePond's own thumbnail
+  // order (newest upload on top, existing images below).
+  const imageEntries = toDescriptionEntries(mockImages, uploadedImages);
 
   return (
     <FormField type="text">
@@ -325,7 +338,7 @@ const ImageUploadField: FC<ImageUploadProps> = ({
             const fileName = file?.file?.name;
 
             if (!!fileName) {
-              const uploadImageFileName = fileName.replace(/\./g, '_');
+              const uploadImageFileName = toUploadedImageName(fileName);
               const fileIsInUploadedImages = uploadedImages.find(
                 (item) => item.name === uploadImageFileName
               );
@@ -339,6 +352,9 @@ const ImageUploadField: FC<ImageUploadProps> = ({
                   (item) => item.options.file.name !== fileName
                 );
                 setMockImages(updatedMockImages);
+                setDescriptions((prev) =>
+                  removeDescription(prev, fileIsInMockImages.source)
+                );
                 return;
               }
 
@@ -348,6 +364,9 @@ const ImageUploadField: FC<ImageUploadProps> = ({
                 (item) => item.name !== uploadImageFileName
               );
               setUploadedImages(updatedImages);
+              setDescriptions((prev) =>
+                removeDescription(prev, fileIsInUploadedImages.url)
+              );
 
               const updatedFiles = files.filter(
                 (item) => item.file.name !== fileName
@@ -383,6 +402,37 @@ const ImageUploadField: FC<ImageUploadProps> = ({
         />
         <NotificationProvider />
       </div>
+
+      {allowImageDescription && imageEntries.length > 0 && (
+        <div className="openstad-image-descriptions">
+          {imageEntries.map((image, index) => {
+            const inputId = `${randomId}-image-description-${index}`;
+            return (
+              <FormField type="text" key={image.url}>
+                <FormLabel htmlFor={inputId}>
+                  {imageDescriptionLabel} ({image.name})
+                </FormLabel>
+                <div className="utrecht-form-field__input">
+                  <Textbox
+                    id={inputId}
+                    name={`${fieldKey}-image-description-${index}`}
+                    type="text"
+                    maxLength={imageDescriptionMaxLength}
+                    value={descriptions[image.url] ?? ''}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                      const nextValue = e.target.value;
+                      setDescriptions((prev) => ({
+                        ...prev,
+                        [image.url]: nextValue,
+                      }));
+                    }}
+                  />
+                </div>
+              </FormField>
+            );
+          })}
+        </div>
+      )}
     </FormField>
   );
 };
