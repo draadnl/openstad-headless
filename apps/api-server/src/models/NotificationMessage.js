@@ -1,4 +1,5 @@
 const fs = require('fs').promises;
+const path = require('path');
 const nunjucks = require('nunjucks');
 const mjml2html = require('mjml');
 const sendMessage = require('../notifications/send-engines');
@@ -12,6 +13,20 @@ let nunjucksEnv;
   nunjucksEnv = new nunjucks.Environment();
   applyFilters(nunjucksEnv);
 })();
+
+async function loadDefaultTemplate(type) {
+  let file = await fs.readFile(
+    path.join(__dirname, '../notifications/default-templates', type)
+  );
+  file = file.toString();
+  let match = file.match(
+    /<subject>((?:.|\r|\n)*)<\/subject>(?:.|\r|\n)*<body>((?:.|\r|\n)*)<\/body>/
+  );
+  let subject = match && match[1];
+  let body = match && match[2];
+  if (subject && body) return { subject, body };
+  return null;
+}
 
 module.exports = (db, sequelize, DataTypes) => {
   const NotificationMessage = sequelize.define(
@@ -77,16 +92,7 @@ module.exports = (db, sequelize, DataTypes) => {
                 },
               });
               if (!template) {
-                let file = await fs.readFile(
-                  `src/notifications/default-templates/${instance.type}`
-                );
-                file = file.toString();
-                let match = file.match(
-                  /<subject>((?:.|\r|\n)*)<\/subject>(?:.|\r|\n)*<body>((?:.|\r|\n)*)<\/body>/
-                );
-                let subject = match && match[1];
-                let body = match && match[2];
-                if (subject && body) template = { subject, body };
+                template = await loadDefaultTemplate(instance.type);
               }
               if (!template) throw new Error('Notification template not found');
 
@@ -148,7 +154,10 @@ module.exports = (db, sequelize, DataTypes) => {
               // mjml2html is now async
               body = await mjml2html(body);
               instance.body = body.html;
-            } catch (err) {}
+            } catch (err) {
+              console.error('Notification template render failed:', err);
+              throw err;
+            }
 
             // Carry PDF attachment as non-persisted property for email sending
             if (options.data?.pdfAttachment) {
@@ -184,3 +193,5 @@ module.exports = (db, sequelize, DataTypes) => {
 
   return NotificationMessage;
 };
+
+module.exports.loadDefaultTemplate = loadDefaultTemplate;
