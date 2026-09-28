@@ -2,8 +2,7 @@ import AuditLogTable from '@/components/audit-log-table';
 import WidgetPreview from '@/components/widget-preview';
 import WidgetPublish from '@/components/widget-publish';
 import { useProject } from '@/hooks/use-project';
-import { useWidgetConfig } from '@/hooks/use-widget-config';
-import { useWidgetPreview } from '@/hooks/useWidgetPreview';
+import { useWidgetDraft } from '@/hooks/useWidgetDraft';
 import {
   WithApiUrlProps,
   withApiUrl,
@@ -48,12 +47,8 @@ export default function WidgetResourceDetail({ apiUrl }: WithApiUrlProps) {
   const id = router.query.id;
   const projectId = router.query.project as string;
 
-  const { data: widget, updateConfig } =
-    useWidgetConfig<ResourceDetailWidgetProps>();
-  const { previewConfig, updatePreview } =
-    useWidgetPreview<ResourceDetailWidgetProps>({
-      projectId,
-    });
+  const { widget, previewConfig, updatePreview, updateConfig, onFieldChanged } =
+    useWidgetDraft<ResourceDetailWidgetProps>({ projectId });
 
   const { data: projectConfig } = useProject(['includeConfig']);
   const requiredFieldsIncludesEmailNotificationConsent =
@@ -61,22 +56,14 @@ export default function WidgetResourceDetail({ apiUrl }: WithApiUrlProps) {
       'emailNotificationConsent'
     );
 
+  const tabUpdateConfig = (config: any) =>
+    updateConfig({ ...widget.config, ...config });
+
   const totalPropPackage = {
     ...widget?.config,
     ...previewConfig,
-    updateConfig: (config: ResourceDetailWidgetProps) => {
-      const merged = { ...widget.config, ...config };
-      updateConfig(merged);
-      updatePreview(merged as ResourceDetailWidgetProps);
-    },
-    onFieldChanged: (key: string, value: any) => {
-      if (previewConfig) {
-        updatePreview({
-          ...previewConfig,
-          [key]: value,
-        });
-      }
-    },
+    updateConfig: tabUpdateConfig,
+    onFieldChanged,
   };
 
   return (
@@ -285,7 +272,7 @@ export default function WidgetResourceDetail({ apiUrl }: WithApiUrlProps) {
                           subWidgetKey: 'commentsWidget',
                           previewConfig: previewConfig,
                           updateConfig,
-                          updatePreview: (config) => console.log(config),
+                          updatePreview,
                           extraChildConfig: {
                             resourceId: previewConfig.resourceId,
                           },
@@ -301,7 +288,7 @@ export default function WidgetResourceDetail({ apiUrl }: WithApiUrlProps) {
                           subWidgetKey: 'commentsWidget_multiple',
                           previewConfig: previewConfig,
                           updateConfig,
-                          updatePreview: (config) => console.log(config),
+                          updatePreview,
                           extraChildConfig: {
                             resourceId: previewConfig.resourceId,
                           },
