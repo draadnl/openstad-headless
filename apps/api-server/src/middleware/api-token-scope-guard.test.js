@@ -39,8 +39,13 @@ function makeRes() {
   const res = {
     _status: null,
     _body: null,
+    _headers: {},
     status(code) {
       this._status = code;
+      return this;
+    },
+    set(key, value) {
+      this._headers[key] = value;
       return this;
     },
     json(body) {
@@ -89,6 +94,13 @@ describe('apiTokenScopeGuard', () => {
 
       expect(res._status).toBe(403);
       expect(next).not.toHaveBeenCalled();
+      expect(res._headers['Content-Type']).toBe('application/problem+json');
+      expect(res._headers['API-Version']).toBe('1.0.0');
+      expect(res._body).toEqual({
+        type: 'https://developer.overheid.nl/api-design-rules/problem/403',
+        title: 'Reporting tokens only allow GET requests',
+        status: 403,
+      });
     });
 
     it('blocks PUT with 403', () => {
@@ -191,6 +203,23 @@ describe('apiTokenScopeGuard', () => {
         enabledPersonalFields: ['title'],
       });
     });
+
+    it('sets API-Version even on the pass-through path (not just on 403s)', () => {
+      const req = makeReq({
+        apiTokenScope: 'reports',
+        method: 'GET',
+        path: '/project/1/resource/total',
+        projectDataScope: {
+          resources: { enabled: true, personalFields: ['title'] },
+        },
+      });
+      const res = makeRes();
+      const next = vi.fn();
+
+      apiTokenScopeGuard(req, res, next);
+
+      expect(res._headers['API-Version']).toBe('1.0.0');
+    });
   });
 
   describe('reporting token — allowlisted non-component path', () => {
@@ -213,6 +242,24 @@ describe('apiTokenScopeGuard', () => {
       expect(req.reportingScope).toMatchObject({ componentKey: null });
       // Only enabled components are exposed to the overview route.
       expect(req.reportingScope.enabledComponents).toEqual(['votes']);
+    });
+
+    it('allows /openapi.json even when no component is enabled — the spec is documentation, and reports/index.js already serves it without a token', () => {
+      const req = makeReq({
+        apiTokenScope: 'reports',
+        method: 'GET',
+        path: '/api/project/1/reports/v1/openapi.json',
+        projectDataScope: { votes: { enabled: false, personalFields: [] } },
+      });
+      const res = makeRes();
+      const next = vi.fn();
+
+      apiTokenScopeGuard(req, res, next);
+
+      expect(next).toHaveBeenCalledOnce();
+      // report-field-filter blocks any reporting response reaching it with no
+      // scope attached, so the guard must still set one.
+      expect(req.reportingScope).toMatchObject({ componentKey: null });
     });
 
     it('blocks /overview when no component is enabled (fail-closed)', () => {
