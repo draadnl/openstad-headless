@@ -69,8 +69,26 @@ console.log('S3 enabled:', s3.isEnabled());
 // overridden via the MAX_FILE_UPLOAD_SIZE_MB env var. This is independent of any
 // per-widget client-side limit and protects the server from oversized uploads
 // that would otherwise stream until a socket timeout and hang without feedback.
-const maxFileUploadBytes =
-  (Number(process.env.MAX_FILE_UPLOAD_SIZE_MB) || 25) * 1024 * 1024;
+const MAX_SANE_FILE_UPLOAD_SIZE_MB = 1000;
+const parsedMaxFileUploadSizeMB = Number(process.env.MAX_FILE_UPLOAD_SIZE_MB);
+const maxFileUploadSizeMB =
+  Number.isInteger(parsedMaxFileUploadSizeMB) &&
+  parsedMaxFileUploadSizeMB > 0 &&
+  parsedMaxFileUploadSizeMB <= MAX_SANE_FILE_UPLOAD_SIZE_MB
+    ? parsedMaxFileUploadSizeMB
+    : 25;
+const rawMaxFileUploadSizeMB = process.env.MAX_FILE_UPLOAD_SIZE_MB;
+if (
+  rawMaxFileUploadSizeMB !== undefined &&
+  rawMaxFileUploadSizeMB.trim() !== '' &&
+  maxFileUploadSizeMB === 25 &&
+  parsedMaxFileUploadSizeMB !== 25
+) {
+  console.warn(
+    `MAX_FILE_UPLOAD_SIZE_MB=${rawMaxFileUploadSizeMB} is invalid (allowed 1-${MAX_SANE_FILE_UPLOAD_SIZE_MB}), using 25`
+  );
+}
+const maxFileUploadBytes = maxFileUploadSizeMB * 1024 * 1024;
 
 const swapLastDotUnderscore = (name) => {
   if (!name) return null;
