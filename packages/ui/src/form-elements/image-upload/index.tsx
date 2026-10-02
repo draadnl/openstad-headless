@@ -85,9 +85,6 @@ export type ImageUploadProps = {
   disabled?: boolean;
   multiple?: boolean;
   maxUploadSizeMB?: number;
-  // Lets the submitter add a remark to their own uploaded image (e.g. "this
-  // image is AI-generated"), reusing the same `images[].description` field
-  // an admin already fills in from the back office.
   allowImageDescription?: boolean;
   imageDescriptionLabel?: string;
   imageDescriptionMaxLength?: number;
@@ -162,8 +159,6 @@ const ImageUploadField: FC<ImageUploadProps> = ({
     { name: string; url: string }[]
   >([]);
 
-  // Prefill remarks already saved on this resource (e.g. one an admin wrote),
-  // keyed by image url so the submitter sees them and can edit or clear them.
   const initialDescriptions: Record<string, string> = {};
   for (const mockImage of initialValue) {
     if (mockImage.description !== undefined) {
@@ -197,8 +192,6 @@ const ImageUploadField: FC<ImageUploadProps> = ({
       });
     }
     didInitRef.current = true;
-    // `descriptions` is included so typing a remark (which changes no
-    // array length) also re-emits the value -- lengths alone would miss it.
   }, [
     uploadedImages.length,
     mockImages.length,
@@ -240,10 +233,11 @@ const ImageUploadField: FC<ImageUploadProps> = ({
 
   const finalImages = Array.from(new Set([...mockImages, ...files]));
 
-  // Display order for the remark boxes -- see toDescriptionEntries in
-  // value.ts for how this was measured against FilePond's own thumbnail
-  // order (newest upload on top, existing images below).
-  const imageEntries = toDescriptionEntries(mockImages, uploadedImages);
+  const imageEntries = toDescriptionEntries(
+    mockImages,
+    uploadedImages,
+    files.map((item) => item.file.name)
+  );
 
   return (
     <FormField type="text">
