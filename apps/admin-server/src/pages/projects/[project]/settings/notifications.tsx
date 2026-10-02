@@ -46,6 +46,7 @@ const formSchema = z.object({
   fromName: z.string().optional(),
   sendUpdatedResourceAdminEmail: z.boolean().optional(),
   sendModBreakNotification: z.boolean().optional(),
+  sendModBreakNotificationToCommenters: z.boolean().optional(),
   pdfAttachmentEnabled: z.boolean().optional(),
   pdfAttachmentAdminEnabled: z.boolean().optional(),
   pdfTitle: z.string().optional(),
@@ -70,6 +71,9 @@ export default function ProjectSettingsNotifications({
         data?.emailConfig?.[category]?.sendUpdatedResourceAdminEmail || false,
       sendModBreakNotification:
         data?.emailConfig?.[category]?.sendModBreakNotification || false,
+      sendModBreakNotificationToCommenters:
+        data?.emailConfig?.[category]?.sendModBreakNotificationToCommenters ||
+        false,
       pdfAttachmentEnabled:
         data?.emailConfig?.[category]?.pdfAttachmentEnabled || false,
       pdfAttachmentAdminEnabled:
@@ -99,6 +103,8 @@ export default function ProjectSettingsNotifications({
           sendUpdatedResourceAdminEmail:
             values.sendUpdatedResourceAdminEmail || false,
           sendModBreakNotification: values.sendModBreakNotification || false,
+          sendModBreakNotificationToCommenters:
+            values.sendModBreakNotificationToCommenters || false,
           pdfAttachmentEnabled: values.pdfAttachmentEnabled || false,
           pdfAttachmentAdminEnabled: values.pdfAttachmentAdminEnabled || false,
           pdfTitle: values.pdfTitle || '',
@@ -228,9 +234,7 @@ export default function ProjectSettingsNotifications({
                 name="sendModBreakNotification"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
-                      Notificatie bij het plaatsen of aanpassen van een modbreak
-                    </FormLabel>
+                    <FormLabel>Modbreak-melding naar de indiener</FormLabel>
                     <FormDescription>
                       Standaard uitgeschakeld. De indiener van de inzending
                       ontvangt een e-mail zodra de redactie een modbreak plaatst
@@ -248,6 +252,36 @@ export default function ProjectSettingsNotifications({
                         <Label htmlFor={field.name} className="cursor-pointer">
                           E-mail sturen naar de indiener als er een modbreak is
                           geplaatst of aangepast
+                        </Label>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="sendModBreakNotificationToCommenters"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Modbreak-melding naar reageerders</FormLabel>
+                    <FormDescription>
+                      Standaard uitgeschakeld. Staat los van de optie hierboven.
+                      Alleen reageerders die toestemming hebben gegeven voor
+                      e-mailnotificaties ontvangen deze mail.
+                    </FormDescription>
+                    <FormControl>
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id={field.name}
+                          checked={field.value}
+                          onCheckedChange={(checked) =>
+                            field.onChange(Boolean(checked))
+                          }
+                        />
+                        <Label htmlFor={field.name} className="cursor-pointer">
+                          E-mail sturen naar reageerders op de inzending als er
+                          een modbreak is geplaatst of aangepast
                         </Label>
                       </div>
                     </FormControl>
