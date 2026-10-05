@@ -169,6 +169,7 @@ module.exports = (db, sequelize, DataTypes) => {
               'updated resource - admin update',
               'notification comment - user',
               'notification comment reply - user',
+              'new modbreak - user feedback',
               'login email',
               'login sms',
               'user account about to expire',

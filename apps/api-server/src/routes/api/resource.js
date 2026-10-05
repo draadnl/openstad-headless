@@ -22,6 +22,13 @@ const { stripVisibilityScope } = require('../../lib/resource-create-scope');
 const {
   restrictModeratorOnlyBody,
 } = require('../../lib/restrict-moderator-only-body');
+const {
+  snapshotModBreakIds,
+  snapshotModBreakDescriptions,
+  findNewModBreaks,
+  findChangedModBreaks,
+  sendModBreakNotifications,
+} = require('../../lib/modbreak-notifications');
 
 const router = express.Router({ mergeParams: true });
 const userhasModeratorRights = (user) => {
@@ -494,6 +501,7 @@ router
     db.Resource.authorizeData(data, 'create', req.user, null, req.project)
       .create(data)
       .then((resourceInstance) => {
+        req.createdResource = resourceInstance;
         // Re-fetch without onlyVisible so the creator gets their own resource
         // back, even when it is still pending (publishDate is null).
         const createScope = stripVisibilityScope(req.scope);
@@ -682,6 +690,20 @@ router
         });
       }
     }
+
+    if (!req.query.nomail && req.createdResource) {
+      const newModBreaks = findNewModBreaks(
+        new Set(),
+        req.createdResource.modBreaks
+      );
+      sendModBreakNotifications({
+        db,
+        req,
+        resource: req.createdResource,
+        newModBreaks,
+        changedModBreaks: [],
+      });
+    }
   });
 
 // one resource
@@ -756,6 +778,13 @@ router
     const wasConcept = currentResource && !currentResource.publishDate;
     const willNowBePublished = req.body['publishDate'];
     req.changedToPublished = wasConcept && willNowBePublished;
+    next();
+  })
+  .put(function (req, res, next) {
+    req.previousModBreakIds = snapshotModBreakIds(req.results.modBreaks);
+    req.previousModBreakDescriptions = snapshotModBreakDescriptions(
+      req.results.modBreaks
+    );
     next();
   })
   .put(rateLimiter(), function (req, res, next) {
@@ -910,6 +939,22 @@ router
         },
       });
     }
+
+    const newModBreaks = findNewModBreaks(
+      req.previousModBreakIds,
+      req.results?.modBreaks
+    );
+    const changedModBreaks = findChangedModBreaks(
+      req.previousModBreakDescriptions,
+      req.results?.modBreaks
+    );
+
+    sendModBreakNotifications({
+      db,
+      req,
+      newModBreaks,
+      changedModBreaks,
+    });
 
     next();
   })
