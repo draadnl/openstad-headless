@@ -19,6 +19,9 @@ const {
   removeSpamMetaFields,
 } = require('../../services/spam-detector');
 const { stripVisibilityScope } = require('../../lib/resource-create-scope');
+const {
+  restrictModeratorOnlyBody,
+} = require('../../lib/restrict-moderator-only-body');
 
 const router = express.Router({ mergeParams: true });
 const userhasModeratorRights = (user) => {
@@ -726,6 +729,7 @@ router
   // update resource
   // -----------
   .put(auth.useReqUser)
+  .put(restrictModeratorOnlyBody)
   .put(function (req, res, next) {
     if (!(
       req.project.config &&
@@ -782,7 +786,7 @@ router
       ...req.body,
     };
 
-    if (!userhasModeratorRights(req.user)) {
+    if (!hasRole(req.user, ['editor', 'moderator'])) {
       delete data.modBreaks;
     }
 

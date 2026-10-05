@@ -110,13 +110,14 @@ export type TextInputProps = {
 };
 
 const TrixEditor: React.FC<{
+  id?: string;
   value: string;
   onChange: (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => void;
   onFocus?: () => void;
   onBlur?: () => void;
-}> = ({ value, onChange, onFocus, onBlur }) => {
+}> = ({ id, value, onChange, onFocus, onBlur }) => {
   const editorRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const editorInstance = useRef<any>(null);
@@ -170,6 +171,12 @@ const TrixEditor: React.FC<{
     const editorEl = editorRef.current;
     const inputEl = inputRef.current;
     if (!editorEl || !inputEl) return;
+
+    if ((editorEl as any).editor) {
+      editorInstance.current = (editorEl as any).editor;
+      targetBlankHrefsRef.current = getTargetBlankHrefs(valueRef.current || '');
+      editorInstance.current.loadHTML(valueRef.current || '');
+    }
 
     const handleTrixInitialize = () => {
       editorInstance.current = (editorEl as any).editor;
@@ -338,7 +345,10 @@ const TrixEditor: React.FC<{
   return (
     <div>
       <input ref={inputRef} type="hidden" id={idRef.current} />
-      <trix-editor ref={editorRef} input={idRef.current}></trix-editor>
+      <trix-editor
+        ref={editorRef}
+        id={id || undefined}
+        input={idRef.current}></trix-editor>
     </div>
   );
 };

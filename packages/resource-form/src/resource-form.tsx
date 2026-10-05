@@ -11,7 +11,12 @@ import React, { useEffect, useRef, useState } from 'react';
 
 import hasRole from '../../lib/has-role';
 import RteContent from '../../ui/src/rte-formatting/rte-content';
+import {
+  canManageModBreaks as computeCanManageModBreaks,
+  isRestrictedToModBreaks,
+} from './parts/can-manage-modbreaks.js';
 import { InitializeFormFields } from './parts/init-fields.js';
+import { moveFieldToColumn } from './parts/move-field-to-column.js';
 import type { ResourceFormWidgetProps } from './props.js';
 
 const getExistingValue = (fieldKey, resource, multiple) => {
@@ -94,24 +99,41 @@ function ResourceFormWidget(props: ResourceFormWidgetProps) {
   const [fillDefaults, setFillDefaults] = useState(false);
   const [currentPage, setCurrentPage] = useState<number>(0);
 
+  const canManageModBreaks = computeCanManageModBreaks(
+    currentUser,
+    canEdit,
+    existingResource?.id
+  );
+
+  const isModeratorOnly = isRestrictedToModBreaks(
+    currentUser,
+    existingResource?.userId
+  );
+
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || currentUserIsLoading) return;
+
+    const visibleFields = canManageModBreaks
+      ? isModeratorOnly
+        ? initialFormFields.filter((field) => field.type === 'modbreak')
+        : initialFormFields
+      : initialFormFields.filter((field) => field.type !== 'modbreak');
 
     if (canEdit) {
-      const updatedFormFields = initialFormFields.map((field) => {
+      const updatedFormFields = visibleFields.map((field) => {
         type FieldsWithMultiple = FieldProps & { multiple?: boolean };
         const fieldWithMultiple = field as FieldsWithMultiple;
 
-        // Timeline is always persisted in the resource.timeline column
-        // (regardless of the configured fieldKey), so read it directly.
         const existingValue =
           field.type === 'timeline'
             ? existingResource?.timeline
-            : getExistingValue(
-                field.fieldKey,
-                existingResource,
-                fieldWithMultiple?.multiple
-              );
+            : field.type === 'modbreak'
+              ? existingResource?.modBreaks
+              : getExistingValue(
+                  field.fieldKey,
+                  existingResource,
+                  fieldWithMultiple?.multiple
+                );
 
         return existingValue
           ? { ...field, defaultValue: existingValue }
@@ -119,10 +141,8 @@ function ResourceFormWidget(props: ResourceFormWidgetProps) {
       });
 
       setFormFields(updatedFormFields);
-    } else if (
-      JSON.stringify(formFields) !== JSON.stringify(initialFormFields)
-    ) {
-      setFormFields(initialFormFields);
+    } else if (JSON.stringify(formFields) !== JSON.stringify(visibleFields)) {
+      setFormFields(visibleFields);
     }
 
     setFillDefaults(true);
@@ -130,6 +150,9 @@ function ResourceFormWidget(props: ResourceFormWidgetProps) {
     JSON.stringify(existingResource),
     JSON.stringify(initialFormFields),
     isLoading,
+    canManageModBreaks,
+    canEdit,
+    currentUserIsLoading,
   ]);
 
   const notifySuccess = () =>
@@ -250,20 +273,20 @@ function ResourceFormWidget(props: ResourceFormWidgetProps) {
       }
     }
 
-    // A timeline-type field is stored in the dedicated resource.timeline
-    // column (like the editorial Tijdlijn tab) instead of in extraData,
-    // regardless of the fieldKey the editor configured for it.
-    const timelineFieldKey = (props.items || [])
-      .filter((item) => item.type === 'timeline')
-      .map((item) => item.fieldKey)
-      .find((key) => !!key);
-    if (
-      timelineFieldKey &&
-      typeof extraData[timelineFieldKey] !== 'undefined'
-    ) {
-      configuredFormData.timeline = extraData[timelineFieldKey];
-      delete extraData[timelineFieldKey];
-    }
+    moveFieldToColumn(
+      extraData,
+      configuredFormData,
+      props.items,
+      'timeline',
+      'timeline'
+    );
+    moveFieldToColumn(
+      extraData,
+      configuredFormData,
+      props.items,
+      'modbreak',
+      'modBreaks'
+    );
 
     configuredFormData.extraData = extraData;
     configuredFormData.publishDate = publish ? new Date() : '';
