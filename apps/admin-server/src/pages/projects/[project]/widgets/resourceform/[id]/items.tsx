@@ -81,6 +81,8 @@ const formSchema = z.object({
     (val) => (val === '' || val === null ? undefined : val),
     z.coerce.number().positive().optional()
   ),
+  allowImageDescription: z.boolean().optional(),
+  imageDescriptionLabel: z.string().optional(),
   prevPageText: z.string().optional(),
   nextPageText: z.string().optional(),
   placeholder: z.string().optional(),
@@ -246,6 +248,8 @@ export default function WidgetResourceFormItems(
             variant: values.variant || 'text input',
             multiple: values.multiple || false,
             maxUploadSizeMB: values.maxUploadSizeMB || 25,
+            allowImageDescription: values.allowImageDescription || false,
+            imageDescriptionLabel: values.imageDescriptionLabel || '',
             prevPageText: values.prevPageText || '',
             nextPageText: values.nextPageText || '',
             options: values.options || [],
@@ -394,6 +398,8 @@ export default function WidgetResourceFormItems(
     variant: 'text input',
     multiple: false,
     maxUploadSizeMB: 25,
+    allowImageDescription: false,
+    imageDescriptionLabel: '',
     prevPageText: '',
     nextPageText: '',
     options: [],
@@ -449,6 +455,8 @@ export default function WidgetResourceFormItems(
         variant: selectedItem.variant || '',
         multiple: selectedItem.multiple || false,
         maxUploadSizeMB: selectedItem.maxUploadSizeMB || 25,
+        allowImageDescription: selectedItem.allowImageDescription || false,
+        imageDescriptionLabel: selectedItem.imageDescriptionLabel || '',
         prevPageText: selectedItem.prevPageText || '',
         nextPageText: selectedItem.nextPageText || '',
         matrix: selectedItem.matrix || matrixDefault,
@@ -1840,6 +1848,76 @@ export default function WidgetResourceFormItems(
                           </FormItem>
                         )}
                       />
+                    )}
+
+                    {(form.watch('type') === 'imageUpload' ||
+                      form.watch('type') === 'images') && (
+                      <>
+                        <FormField
+                          control={form.control}
+                          name="allowImageDescription"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>
+                                Mag de indiener een opmerking bij een afbeelding
+                                zetten?
+                              </FormLabel>
+                              <Select
+                                onValueChange={(e: string) =>
+                                  field.onChange(e === 'true')
+                                }
+                                value={field.value ? 'true' : 'false'}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Kies een optie" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="true">Ja</SelectItem>
+                                  <SelectItem value="false">Nee</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        {form.watch('allowImageDescription') && (
+                          <FormField
+                            control={form.control}
+                            name="imageDescriptionLabel"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>
+                                  Label van het opmerkingveld
+                                </FormLabel>
+                                <FormDescription>
+                                  <em className="text-xs">
+                                    Standaard: &quot;Opmerking bij deze
+                                    afbeelding&quot;.
+                                  </em>
+                                </FormDescription>
+                                <Input type="text" {...field} />
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
+
+                        {form.watch('allowImageDescription') &&
+                          form.watch('fieldKey') !== 'images' && (
+                            <FormDescription>
+                              <em className="text-xs text-red-600">
+                                Let op: de opmerking wordt alleen opgeslagen in
+                                de eigen afbeeldingen-kolom van de inzending (en
+                                dus alleen op de detailpagina getoond) als de
+                                veldsleutel exact &quot;images&quot; is. Bij een
+                                andere veldsleutel komt de waarde in extraData
+                                terecht en wordt hij niet getoond.
+                              </em>
+                            </FormDescription>
+                          )}
+                      </>
                     )}
 
                     {form.watch('type') !== 'pagination' && (

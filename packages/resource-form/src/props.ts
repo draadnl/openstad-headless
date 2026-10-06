@@ -86,6 +86,8 @@ export type Item = {
   selectAll?: boolean;
   selectAllLabel?: string;
   allowedTypes?: string[];
+  allowImageDescription?: boolean;
+  imageDescriptionLabel?: string;
 };
 
 export type Option = {

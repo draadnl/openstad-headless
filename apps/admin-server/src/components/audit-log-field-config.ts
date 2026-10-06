@@ -47,6 +47,8 @@ export const FIELD_LABELS: Record<string, string> = {
   maxValue: 'Maximumwaarde',
   defaultValue: 'Standaardwaarde',
   multiple: 'Meerdere toestaan',
+  allowImageDescription: 'Opmerking bij afbeelding toestaan',
+  imageDescriptionLabel: 'Label van het opmerkingveld',
   maxChoices: 'Maximaal te selecteren opties',
   maxChoicesMessage: 'Maximaal aantal bereikt melding',
   showSmileys: 'Smileys tonen',
