@@ -43,8 +43,6 @@ module.exports = async function processQueuedNotifications(database) {
 
             let instance = target[0]; // ignore other multiple fields like subject
 
-            // One failing target must not block the others; it stays queued
-            // and is retried on the next run.
             try {
               let message = await db.NotificationMessage.create(
                 {
@@ -65,9 +63,19 @@ module.exports = async function processQueuedNotifications(database) {
               }
             } catch (err) {
               console.error(
-                `Queued notifications ${target.map((entry) => entry.id).join(', ')} (type: ${type}, projectId: ${projectId}) failed to send:`,
+                `Queued notifications ${target.map((entry) => entry.id).join(', ')} (type: ${type}, projectId: ${projectId}) failed to send, marking as failed:`,
                 err
               );
+              for (let entry of target) {
+                try {
+                  await entry.update({ status: 'failed' });
+                } catch (updateErr) {
+                  console.error(
+                    `Queued notification ${entry.id} could not be marked as failed:`,
+                    updateErr
+                  );
+                }
+              }
             }
           }
         }

@@ -34,7 +34,7 @@ describe('processQueuedNotifications', () => {
     });
   }
 
-  it('keeps sending the next target when one target fails to render', async () => {
+  it('marks a failing target as failed and keeps sending the next target', async () => {
     const broken = makeNotification({ id: 1, projectId: 1 });
     const healthy = makeNotification({ id: 2, projectId: 2 });
     withQueued([broken, healthy]);
@@ -47,7 +47,8 @@ describe('processQueuedNotifications', () => {
 
     await processQueuedNotifications(db);
 
-    expect(broken.update).not.toHaveBeenCalled();
+    expect(broken.update).toHaveBeenCalledWith({ status: 'failed' });
+    expect(broken.update).not.toHaveBeenCalledWith({ status: 'sent' });
     expect(send).toHaveBeenCalledTimes(1);
     expect(healthy.update).toHaveBeenCalledWith({ status: 'sent' });
     expect(console.error).toHaveBeenCalledWith(
