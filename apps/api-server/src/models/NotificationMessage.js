@@ -15,9 +15,19 @@ let nunjucksEnv;
 })();
 
 async function loadDefaultTemplate(type) {
-  let file = await fs.readFile(
-    path.join(__dirname, '../notifications/default-templates', type)
-  );
+  let file;
+  try {
+    file = await fs.readFile(
+      path.join(
+        __dirname,
+        '../notifications/default-templates',
+        path.basename(type || '')
+      )
+    );
+  } catch (err) {
+    if (err.code === 'ENOENT') return null;
+    throw err;
+  }
   file = file.toString();
   let match = file.match(
     /<subject>((?:.|\r|\n)*)<\/subject>(?:.|\r|\n)*<body>((?:.|\r|\n)*)<\/body>/

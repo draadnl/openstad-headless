@@ -1,6 +1,7 @@
+import nodeFs from 'fs';
 import fs from 'fs/promises';
 import path from 'path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import NotificationMessageFactory from './NotificationMessage.js';
 
@@ -9,8 +10,6 @@ const TEMPLATES_DIR = path.join(
   '../notifications/default-templates'
 );
 
-// Pins the reported defect: a project without its own NotificationTemplate
-// row must still get a mail, via the bundled default-templates file.
 describe('loadDefaultTemplate', () => {
   it('resolves a non-empty subject and body for notification comment - user', async () => {
     const template = await NotificationMessageFactory.loadDefaultTemplate(
@@ -32,39 +31,26 @@ describe('loadDefaultTemplate', () => {
     expect(template.body.trim().length).toBeGreaterThan(0);
   });
 
-  // Proves the previous test is not a tautology: with the file removed,
-  // resolution must fail (return null), which is what happened before this
-  // fix — the mail silently disappeared instead.
-  describe('without the bundled file (regression guard)', () => {
-    const filePath = path.join(TEMPLATES_DIR, 'notification comment - user');
-    const tempPath = `${filePath}.tmp-removed-for-test`;
+  it('returns null when there is no bundled file for the type', async () => {
+    expect(
+      await NotificationMessageFactory.loadDefaultTemplate('no such template')
+    ).toBeNull();
+  });
 
-    beforeEach(async () => {
-      await fs.rename(filePath, tempPath);
-    });
+  it('only reads from the default-templates folder', async () => {
+    const readFile = vi.spyOn(nodeFs.promises, 'readFile');
 
-    afterEach(async () => {
-      await fs.rename(tempPath, filePath);
-    });
+    await NotificationMessageFactory.loadDefaultTemplate(
+      '../../models/NotificationMessage.js'
+    );
 
-    it('returns null when the default template file is missing', async () => {
-      await expect(
-        NotificationMessageFactory.loadDefaultTemplate(
-          'notification comment - user'
-        )
-      ).rejects.toThrow();
-    });
+    expect(readFile).toHaveBeenCalledWith(
+      path.join(TEMPLATES_DIR, 'NotificationMessage.js')
+    );
+    readFile.mockRestore();
   });
 });
 
-// Every file in default-templates/ must have exactly one <subject> and one
-// <body> block with non-empty content. A greedy regex match alone is too
-// weak: it is exactly what accepted the malformed double-<subject> file
-// fixed alongside this test.
-// 'new or updated comment - admin update' has no <subject> block at all and
-// is a pre-existing, unrelated defect (that notification type is also never
-// created anywhere in the codebase) tracked for its own ticket — out of
-// scope here, so it is excluded rather than silently fixed as a side effect.
 const KNOWN_BROKEN_TEMPLATES = ['new or updated comment - admin update'];
 
 describe('default-templates shape', () => {
