@@ -29,6 +29,9 @@ const userHasRole = require('../lib/sequelize-authorization/lib/hasRole');
 const roles = require('../lib/sequelize-authorization/lib/roles');
 const getExtraDataConfig = require('../lib/sequelize-authorization/lib/getExtraDataConfig');
 const htmlToText = require('html-to-text');
+const {
+  assertImageDescriptionsWithinLimit,
+} = require('../lib/image-description');
 
 function hideEmailsForNormalUsers(comments) {
   return comments.map((comment) => {
@@ -224,6 +227,11 @@ module.exports = function (db, sequelize, DataTypes) {
         type: DataTypes.JSON,
         allowNull: null,
         defaultValue: [],
+        validate: {
+          descriptionLength(value) {
+            assertImageDescriptionsWithinLimit(value);
+          },
+        },
       },
 
       documents: {
