@@ -33,6 +33,11 @@ const userHasRole = require('../lib/sequelize-authorization/lib/hasRole');
 const roles = require('../lib/sequelize-authorization/lib/roles');
 const getExtraDataConfig = require('../lib/sequelize-authorization/lib/getExtraDataConfig');
 const htmlToText = require('html-to-text');
+const {
+  filterPublicExtraData,
+  EDITOR_PUBLIC_EXTRA_DATA_KEY_AUTH,
+} = require('./lib/filter-public-extra-data');
+const isSafeImageUrl = require('../lib/is-safe-image-url');
 
 function hideEmailsForNormalUsers(comments) {
   return comments.map((comment) => {
@@ -254,7 +259,11 @@ module.exports = function (db, sequelize, DataTypes) {
         },
       },
 
-      extraData: getExtraDataConfig(DataTypes.JSON, 'resources'),
+      extraData: getExtraDataConfig(
+        DataTypes.JSON,
+        'resources',
+        EDITOR_PUBLIC_EXTRA_DATA_KEY_AUTH
+      ),
 
       timeline: {
         type: DataTypes.JSON,
@@ -585,6 +594,12 @@ module.exports = function (db, sequelize, DataTypes) {
           }
 
           checkValue(value, configExtraData);
+
+          if (value.partnerLogo && !isSafeImageUrl(value.partnerLogo)) {
+            errors.push(
+              'De waarde van partnerLogo is geen geldige afbeeldings-URL'
+            );
+          }
 
           if (errors.length) {
             console.log('Resource validation error:', errors);
@@ -1227,8 +1242,6 @@ module.exports = function (db, sequelize, DataTypes) {
     // canEditAfterFirstLikeOrComment is handled in the validate hook
   };
 
-  const alwaysPublicExtraDataKeys = ['originalId', 'ranking'];
-
   let canViewModeratorOnlyExtraData = function (user, self) {
     return userHasRole(user, 'moderator', self.userId);
   };
@@ -1329,28 +1342,10 @@ module.exports = function (db, sequelize, DataTypes) {
         data.extraData &&
         typeof data.extraData === 'object'
       ) {
-        if (hasResourceFormConfig) {
-          Object.keys(data.extraData).forEach((key) => {
-            if (
-              !resourceFormFieldKeys.includes(key) &&
-              !alwaysPublicExtraDataKeys.includes(key)
-            ) {
-              delete data.extraData[key];
-            }
-          });
-        } else {
-          const preserved = {};
-          alwaysPublicExtraDataKeys.forEach((key) => {
-            if (data.extraData[key] !== undefined)
-              preserved[key] = data.extraData[key];
-          });
-          data.extraData = preserved;
-        }
-
-        moderatorOnlyExtraDataKeys.forEach((key) => {
-          if (!alwaysPublicExtraDataKeys.includes(key)) {
-            delete data.extraData[key];
-          }
+        filterPublicExtraData(data, {
+          hasResourceFormConfig,
+          resourceFormFieldKeys,
+          moderatorOnlyExtraDataKeys,
         });
       }
 

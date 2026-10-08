@@ -3,7 +3,7 @@
 const userHasRole = require('./hasRole');
 var sanitize = require('../../../util/sanitize');
 
-module.exports = function (dataTypeJSON, projectConfigKey) {
+module.exports = function (dataTypeJSON, projectConfigKey, keyAuth = {}) {
   return {
     type: dataTypeJSON,
     allowNull: false,
@@ -95,6 +95,10 @@ module.exports = function (dataTypeJSON, projectConfigKey) {
               project.config[projectConfigKey].extraData[key].auth[
                 action + 'ableBy'
               ];
+            testRole =
+              testRole ||
+              (Object.prototype.hasOwnProperty.call(keyAuth, key) &&
+                keyAuth[key][action + 'ableBy']);
             testRole =
               testRole || self.rawAttributes.extraData.auth[action + 'ableBy'];
             testRole =
