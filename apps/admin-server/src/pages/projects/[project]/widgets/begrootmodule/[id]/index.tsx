@@ -26,6 +26,7 @@ import WidgetStemBegrootSearch from './search';
 import WidgetStemBegrootSorting from './sorting';
 import WidgetStemBegrootOverviewTags from './tags';
 import BegrootmoduleText from './text';
+import BegrootmoduleVoteLinks from './vote-links';
 
 export const getServerSideProps = withApiUrl;
 
@@ -86,6 +87,7 @@ export default function WidgetBegrootModule({ apiUrl }: WithApiUrlProps) {
               <TabsTrigger value="sorting">Sorteer opties</TabsTrigger>
               <TabsTrigger value="pagination">Paginering</TabsTrigger>
               <TabsTrigger value="include">Inclusief/exclusief</TabsTrigger>
+              <TabsTrigger value="votelinks">Stemlinks</TabsTrigger>
               <TabsTrigger value="publish">Publiceren</TabsTrigger>
               <TabsTrigger value="auditlog">Logboek</TabsTrigger>
             </TabsList>
@@ -115,6 +117,9 @@ export default function WidgetBegrootModule({ apiUrl }: WithApiUrlProps) {
                 </TabsContent>
                 <TabsContent value="include" className="p-0">
                   <WidgetStemBegrootInclude {...totalPropPackage} />
+                </TabsContent>
+                <TabsContent value="votelinks" className="p-0">
+                  <BegrootmoduleVoteLinks {...totalPropPackage} />
                 </TabsContent>
                 <TabsContent value="publish" className="p-0">
                   <WidgetPublish apiUrl={apiUrl} />
