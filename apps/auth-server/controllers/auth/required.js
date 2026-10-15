@@ -1,9 +1,10 @@
 const userFields = require('../../config/user').fields;
 const sanitize = require('../../utils/sanitize');
 
-// Opt-in: inwoners vullen bij 'naam' regelmatig hun e-mailadres in, dat
-// daarna publiek bij reacties staat. Met REQUIRED_FIELDS_BLOCK_AT_SIGN
-// weigeren de tekstvelden (behalve e-mail en toegangscode) een '@'.
+// Opt-in: residents regularly fill in their e-mail address as their name,
+// which then shows publicly next to their comments. With
+// REQUIRED_FIELDS_BLOCK_AT_SIGN the text fields (except e-mail and access
+// code) refuse an '@'.
 const isAtSignBlocked = () =>
   ['true', 'yes', '1'].includes(
     String(process.env.REQUIRED_FIELDS_BLOCK_AT_SIGN || '')
@@ -69,8 +70,8 @@ exports.index = (req, res, next) => {
   const requiredUserFieldsLabels =
     (config && config.requiredFields?.requiredUserFieldsLabels) || {};
 
-  // Alleen absolute http(s)-URL's; new URL(...).href percent-encodeert
-  // quotes zodat de waarde veilig in het href-attribuut kan
+  // Only absolute http(s) URLs; new URL(...).href percent-encodes quotes so
+  // the value is safe inside the href attribute
   let privacyPolicyUrl = '';
   try {
     const parsed = new URL(
@@ -153,8 +154,8 @@ exports.post = (req, res, next) => {
       )
     );
 
-  // Eerst valideren, dan pas opslaan: een redirect vanuit de forEach
-  // hieronder zou de update niet tegenhouden
+  // Validate before saving: a redirect from inside the forEach below would
+  // not stop the update
   const errors = [];
   clientRequiredUserFields.forEach((key) => {
     const field = userFields.find((userField) => userField.key === key);
@@ -182,7 +183,7 @@ exports.post = (req, res, next) => {
   if (errors.length > 0) {
     errors.forEach((msg) => req.flash('error', { msg }));
 
-    // Ingevulde tekstvelden bewaren zodat de inwoner niet alles opnieuw hoeft te typen
+    // Keep the typed text values so the resident doesn't have to retype them
     const values = {};
     clientRequiredUserFields.forEach((key) => {
       const field = userFields.find((userField) => userField.key === key);
