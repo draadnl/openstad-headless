@@ -98,8 +98,6 @@ export type ResourceDetailWidgetProps = {
     collapseTagType?: string;
     collapseTagLabel?: string;
     headingLevel?: number;
-    // Opt-in "Steun dit plan!" block: links to the page with the begroot
-    // widget, with ?openstadResourceId=<id> so the resource is preselected.
     displayVoteLinkButton?: boolean;
     voteLinkPageUrl?: string;
     voteLinkTitle?: string;
@@ -310,8 +308,6 @@ function ResourceDetail({
 
   const timelineItems = resource?.timeline ?? [];
 
-  // No vote button when the resource's status does not allow voting: the
-  // begroot widget would not add it to the selection anyway.
   const voteLink =
     displayVoteLinkButton && canLikeResource(resource)
       ? buildResourceVoteLink(voteLinkPageUrl, resource.id)
