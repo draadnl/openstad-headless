@@ -127,3 +127,10 @@ Preferably this should be a string of at least 32 characters. You can generate i
 The salt should be kept secret and not shared with anyone, to ensure the security of the phone number hashing process.
 
 This `AUTH_PHONE_HASH_SALT` variable is generated automatically during the setup process, but you can also set it manually in your `.env` file if needed.
+
+## Block `@` in required fields (`REQUIRED_FIELDS_BLOCK_AT_SIGN`) (2026-10-15)
+
+Residents regularly fill in their e-mail address as their name on the "Aanvullende gegevens" (required fields) screen of the auth server, which then shows up publicly next to their comments.
+Set `REQUIRED_FIELDS_BLOCK_AT_SIGN=true` on the auth server to refuse an `@` in the text fields of that screen (name, address fields, phone number; e-mail and access code are exempt). The browser blocks submitting, and the server shows an error and does not save.
+
+Off by default. In the Helm chart set `auth.requiredFields.blockAtSign: true`; with docker compose set `AUTH_REQUIRED_FIELDS_BLOCK_AT_SIGN=true` in your `.env`.

@@ -44,6 +44,8 @@
               {{'autofocus' if first}}
               id="input_field_{{requiredField.key}}"
               autocomplete="name"
+              {% if requiredField.value %}value="{{requiredField.value}}"{% endif %}
+              {% if requiredField.blockAtSign %}pattern="[^@]*" title="Een @ is hier niet toegestaan. Vul hier niet je e-mailadres in."{% endif %}
             />
           {% endif %}
 				</div>
