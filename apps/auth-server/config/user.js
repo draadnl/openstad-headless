@@ -6,6 +6,7 @@ exports.fields = [
   {
     key: 'email',
     label: 'E-mail adres',
+    allowAtSign: true,
   },
   {
     key: 'phoneNumber',
@@ -44,6 +45,7 @@ exports.fields = [
   {
     key: 'accessCode',
     label: 'Toegangscode',
+    allowAtSign: true,
   },
 ];
 

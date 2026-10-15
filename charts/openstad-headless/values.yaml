@@ -245,6 +245,11 @@ auth:
   # Cookie settings
   cookie:
     secureOff:
+  # Screen 'Aanvullende gegevens' (required fields)
+  requiredFields:
+    # Refuse an '@' in text fields such as name, so residents can't fill in
+    # their e-mail address as (public) name (env: REQUIRED_FIELDS_BLOCK_AT_SIGN)
+    blockAtSign: false
   # OpenTelemetry (env: OTEL_SERVICE_NAME, OTEL_EXPORTER_OTLP_ENDPOINT) - override per deployment
   otelServiceName: openstad-auth-server
   otelExporterOtlpEndpoint: http://openstad-otel-collector:4317

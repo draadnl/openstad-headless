@@ -1,8 +1,34 @@
 const userFields = require('../../config/user').fields;
 const sanitize = require('../../utils/sanitize');
 
+// Opt-in: inwoners vullen bij 'naam' regelmatig hun e-mailadres in, dat
+// daarna publiek bij reacties staat. Met REQUIRED_FIELDS_BLOCK_AT_SIGN
+// weigeren de tekstvelden (behalve e-mail en toegangscode) een '@'.
+const isAtSignBlocked = () =>
+  ['true', 'yes', '1'].includes(
+    String(process.env.REQUIRED_FIELDS_BLOCK_AT_SIGN || '')
+      .trim()
+      .toLowerCase()
+  );
+
+const blocksAtSign = (field) =>
+  isAtSignBlocked() &&
+  !!field &&
+  field.type !== 'checkbox' &&
+  !field.allowAtSign;
+
+const getFieldLabel = (req, field) => {
+  const labels =
+    req.client?.config?.requiredFields?.requiredUserFieldsLabels || {};
+  return sanitize.noTags(labels[field.key] || field.label);
+};
+
+const consumeFlash = (req, key) =>
+  (typeof req.flash === 'function' && req.flash(key)?.[0]) || {};
+
 exports.index = (req, res, next) => {
   let requiredUserFields = req.client.requiredUserFields;
+  const previousValues = consumeFlash(req, 'requiredFieldsValues');
 
   requiredUserFields = requiredUserFields
     .map((field) => {
@@ -94,6 +120,15 @@ exports.index = (req, res, next) => {
     return field;
   });
 
+  requiredUserFields = requiredUserFields.map((field) => {
+    if (field.type === 'checkbox') return field;
+    field.blockAtSign = blocksAtSign(field);
+    if (typeof previousValues[field.key] === 'string') {
+      field.value = previousValues[field.key];
+    }
+    return field;
+  });
+
   res.render('auth/required-fields', {
     client: sanitize.client(req.client),
     clientId: sanitize.plainText(req.client.clientId),
@@ -118,6 +153,52 @@ exports.post = (req, res, next) => {
       )
     );
 
+  // Eerst valideren, dan pas opslaan: een redirect vanuit de forEach
+  // hieronder zou de update niet tegenhouden
+  const errors = [];
+  clientRequiredUserFields.forEach((key) => {
+    const field = userFields.find((userField) => userField.key === key);
+    if (!field) return;
+
+    if (key === 'privacyConsent') {
+      const clientId = String(req?.client?.id);
+      const currentValue = req?.user?.privacyConsentAt || {};
+      if (!currentValue.hasOwnProperty(clientId) && req.body[key] !== 'on') {
+        errors.push(
+          'Je moet akkoord gaan met de privacyverklaring om verder te gaan.'
+        );
+      }
+    } else if (
+      blocksAtSign(field) &&
+      typeof req.body[key] === 'string' &&
+      req.body[key].includes('@')
+    ) {
+      errors.push(
+        `Het veld '${getFieldLabel(req, field)}' mag geen @ bevatten. Vul hier niet je e-mailadres in.`
+      );
+    }
+  });
+
+  if (errors.length > 0) {
+    errors.forEach((msg) => req.flash('error', { msg }));
+
+    // Ingevulde tekstvelden bewaren zodat de inwoner niet alles opnieuw hoeft te typen
+    const values = {};
+    clientRequiredUserFields.forEach((key) => {
+      const field = userFields.find((userField) => userField.key === key);
+      if (
+        field &&
+        field.type !== 'checkbox' &&
+        typeof req.body[key] === 'string'
+      ) {
+        values[key] = req.body[key];
+      }
+    });
+    req.flash('requiredFieldsValues', values);
+
+    return res.redirect(`/auth/required-fields?redirect_uri=${redirectUrl}`);
+  }
+
   let data = {};
   clientRequiredUserFields.forEach((field) => {
     if (field === 'emailNotificationConsent') {
@@ -140,14 +221,6 @@ exports.post = (req, res, next) => {
       const clientConsentIsSet = currentValue.hasOwnProperty(clientId);
 
       if (!clientConsentIsSet) {
-        if (req.body[field] !== 'on') {
-          req.flash('error', {
-            msg: 'Je moet akkoord gaan met de privacyverklaring om verder te gaan.',
-          });
-          return res.redirect(
-            `/auth/required-fields?redirect_uri=${redirectUrl}`
-          );
-        }
         data['privacyConsentAt'] = {
           ...currentValue,
           [clientId]: new Date().toISOString(),

@@ -242,6 +242,9 @@ spec:
             value: "http://{{ template "openstad.api.fullname" . }}:{{ .Values.api.service.httpPort }}/api/audit-log/auth-event"
           - name: AUDIT_API_TOKEN
             value: {{ .Values.api.audit.internalToken | quote }}
+
+          - name: REQUIRED_FIELDS_BLOCK_AT_SIGN
+            value: {{ (.Values.auth.requiredFields | default dict).blockAtSign | default false | quote }}
           {{- if .Values.auth.extraEnvVars }}
           {{- include "common.tplvalues.render" (dict "value" .Values.auth.extraEnvVars "context" $) | nindent 10 }}
           {{- end }}
