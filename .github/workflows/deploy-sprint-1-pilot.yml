@@ -102,7 +102,15 @@ jobs:
       packages: write
     strategy:
       matrix:
-        app: [admin-server, api-server, auth-server, image-server, cms-server]
+        app:
+          [
+            admin-server,
+            api-server,
+            auth-server,
+            image-server,
+            cms-server,
+            mcp-server,
+          ]
         include:
           - app: api-server
             build-target: release-with-packages
@@ -171,7 +179,7 @@ jobs:
           REPO_OWNER: ${{ github.repository_owner }}
         run: |
           yq -i ".version = \"$RELEASE_VERSION\"" charts/openstad-headless/Chart.yaml
-          for pair in admin:admin-server api:api-server auth:auth-server image:image-server cms:cms-server; do
+          for pair in admin:admin-server api:api-server auth:auth-server image:image-server cms:cms-server mcp:mcp-server; do
             KEY="${pair%%:*}"
             APP="${pair#*:}"
             yq -i ".${KEY}.deploymentContainer.image = \"ghcr.io/${REPO_OWNER}/${APP}:${IMAGE_TAG}\"" charts/openstad-headless/values.yaml

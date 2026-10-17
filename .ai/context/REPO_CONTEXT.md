@@ -18,7 +18,7 @@ Node 24 (Docker base image `node:24-slim`), npm workspaces.
 ## Repo map
 
 ```
-/apps                  Server applications (5, see per-app context files)
+/apps                  Server applications (6, see per-app context files)
 /packages              React widgets + shared libs (see WIDGETS_CONTEXT.md)
 /packages/apostrophe-widgets  ApostropheCMS widgets for cms-server (separate system)
 /doc                   Human documentation (setup, deployment, testing, audit logging, …)
@@ -48,6 +48,7 @@ graph LR
         API["api-server<br/>Express :31410"]
         Auth["auth-server<br/>OAuth2 :31430"]
         Image["image-server<br/>:31450/:31451"]
+        MCP["mcp-server<br/>:3900"]
     end
 
     subgraph Storage
@@ -65,6 +66,7 @@ graph LR
     Admin -- "OAuth2 client" --> Auth
     API -- "code exchange + userinfo" --> Auth
     API -- "IMAGE_VERIFICATION_TOKEN" --> Image
+    MCP -- "Bearer reporting-token + X-Reporting-Project-Id" --> API
     Auth -- "audit events" --> API
     API --> MySQL
     Auth --> MySQL
@@ -99,6 +101,7 @@ Shared secrets binding the services (env vars):
 | image-server image serving | `IMAGE_PORT_IMAGE_SERVER` | 31451 |
 | admin-server               | `ADMIN_PORT`              | 31470 |
 | cms-server                 | `CMS_PORT`                | 31490 |
+| mcp-server                 | `MCP_PORT`                | 3900  |
 
 Infra: MySQL 3306, Redis 6379, Mailpit 1025/8025 (local mail), Jaeger 16686 (tracing UI),
 OTel collector 4317/4318. All apps initialize OpenTelemetry via `@openstad-headless/lib/telemetry`
@@ -108,7 +111,7 @@ OTel collector 4317/4318. All apps initialize OpenTelemetry via `@openstad-headl
 
 | File                                       | Purpose                                                                              |
 | ------------------------------------------ | ------------------------------------------------------------------------------------ |
-| `docker-compose.yml`                       | Primary: infra (MySQL, Redis, Mongo, Mailpit, Jaeger, OTel) + all 5 apps, dev target |
+| `docker-compose.yml`                       | Primary: infra (MySQL, Redis, Mongo, Mailpit, Jaeger, OTel) + all 6 apps, dev target |
 | `docker-compose.release.yml`               | Override pinning services to production (`release`) image targets                    |
 | `docker-compose.e2e.yml` / `.e2e.init.yml` | CI E2E stack + database bootstrap                                                    |
 | `docker-compose.override.yml`              | **Gitignored, developer-local** overrides — never reference in committed code        |

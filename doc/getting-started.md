@@ -131,7 +131,7 @@ The code is mounted from the `/apps` dirs in the repo, and run using `nodemon`. 
 
 ### Docker containers
 
-Six docker containers have been created:
+Eight docker containers have been created:
 
 - openstad-mysql
 - openstad-mailhog
@@ -140,6 +140,7 @@ Six docker containers have been created:
 - openstad-image-server
 - openstad-admin-server
 - openstad-cms-server
+- openstad-mcp-server
 
 ### One-off Docker Compose commands
 

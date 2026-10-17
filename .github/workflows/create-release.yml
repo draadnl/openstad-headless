@@ -192,7 +192,15 @@ jobs:
       packages: write
     strategy:
       matrix:
-        app: [admin-server, api-server, auth-server, image-server, cms-server]
+        app:
+          [
+            admin-server,
+            api-server,
+            auth-server,
+            image-server,
+            cms-server,
+            mcp-server,
+          ]
         include:
           - app: api-server
             build-target: release-with-packages
@@ -285,6 +293,8 @@ jobs:
           /snap/bin/yq -i ".auth.deploymentContainer.image = \"ghcr.io/$REPO_OWNER/auth-server:$IMAGE_TAG\"" ./charts/openstad-headless/values.yaml
           /snap/bin/yq -i ".image.deploymentContainer.image = \"ghcr.io/$REPO_OWNER/image-server:$IMAGE_TAG\"" ./operations/deployments/openstad-headless/environments/prod/images.yml
           /snap/bin/yq -i ".image.deploymentContainer.image = \"ghcr.io/$REPO_OWNER/image-server:$IMAGE_TAG\"" ./charts/openstad-headless/values.yaml
+          /snap/bin/yq -i ".mcp.deploymentContainer.image = \"ghcr.io/$REPO_OWNER/mcp-server:$IMAGE_TAG\"" ./operations/deployments/openstad-headless/environments/prod/images.yml
+          /snap/bin/yq -i ".mcp.deploymentContainer.image = \"ghcr.io/$REPO_OWNER/mcp-server:$IMAGE_TAG\"" ./charts/openstad-headless/values.yaml
 
       - name: Install Helm
         uses: azure/setup-helm@v3

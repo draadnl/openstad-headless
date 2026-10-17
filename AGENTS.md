@@ -12,8 +12,9 @@ context file for the app or package you are changing. Human-oriented documentati
 OpenStad is an open-source citizen participation platform. This is a monorepo using npm
 workspaces (`apps/*`, `packages/*`, `packages/apostrophe-widgets/*`) with:
 
-- **5 server apps** in `apps/`: api-server (Express REST API), auth-server (OAuth2 SSO),
-  admin-server (Next.js admin UI), cms-server (ApostropheCMS websites), image-server (uploads/resizing).
+- **6 server apps** in `apps/`: api-server (Express REST API), auth-server (OAuth2 SSO),
+  admin-server (Next.js admin UI), cms-server (ApostropheCMS websites), image-server (uploads/resizing),
+  mcp-server (reporting MCP endpoint).
 - **40+ widget packages** in `packages/`: React widgets built to IIFE bundles that any external
   website can embed via a single `<script>` tag served by the api-server.
 

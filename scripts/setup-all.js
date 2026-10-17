@@ -7,6 +7,10 @@ const initAdminServer = require('./setup-admin');
 const initCmsServer = require('./setup-cms');
 const createNginxConfigExample = require('./create-nginx-config-example');
 
+// mcp-server has no database, config file or certs to set up (its
+// apps/mcp-server/src/config.js has safe defaults for everything), so it has
+// no setup module here and is intentionally left out of `npm run setup`.
+
 let modules = [
   initApi,
   initImageServer,

@@ -10,3 +10,6 @@ auth:
 image:
   deploymentContainer:
     image: openstad/headless-image-server:local-release
+mcp:
+  deploymentContainer:
+    image: openstad/headless-mcp-server:local-release

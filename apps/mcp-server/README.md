@@ -4,10 +4,19 @@ Exposes the Openstad reporting API (`/api/project/:projectId/reports/v1/...`) as
 
 ## Deployment model: one server per installation, multi-project within it
 
-> **Not deployable from this repo yet.** There is no `docker-compose` service, no
-> Helm chart template and no entry in the image-build matrix for this app — it
-> ships as source. The section below describes how it is _meant_ to be deployed;
-> the compose service, chart template and `MCP_*` wiring land with that work.
+This app is built and deployed like the other server apps: it has an image-build
+matrix entry, a `docker-compose` service (`openstad-mcp-server`), and a Helm
+chart template (`charts/openstad-headless/templates/mcp/`). To deploy it:
+
+- Set `mcp.deploymentContainer.image` to the image you want to run.
+- Set `mcp.ingress.enabled: true` and `mcp.subdomain` (or `mcp.ingress.hosts`)
+  in the environment's values file to expose it — it defaults to `false`,
+  since publicly exposing it is opt-in per installation.
+- The three `MCP_*` environment variables below are set automatically by the
+  Helm template: `MCP_HOST=0.0.0.0`, `MCP_REPORTING_API_BASE_URL` (the
+  in-cluster api-server address) and `MCP_ALLOWED_HOSTS` (the rendered
+  ingress hostname(s) plus `localhost`/`127.0.0.1`, as **bare hostnames
+  without a port** — see the note below).
 
 `MCP_REPORTING_API_BASE_URL` binds an MCP server to exactly **one** api-server, and Openstad is deployed as one installation per municipality. So deploy **one MCP server per Openstad installation** (alongside its api-server, in the same namespace) — a token issued on another installation only yields 401s here.
 

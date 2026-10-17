@@ -198,7 +198,15 @@ jobs:
       packages: write
     strategy:
       matrix:
-        app: [admin-server, api-server, auth-server, image-server, cms-server]
+        app:
+          [
+            admin-server,
+            api-server,
+            auth-server,
+            image-server,
+            cms-server,
+            mcp-server,
+          ]
         include:
           - app: api-server
             build-target: release-with-packages

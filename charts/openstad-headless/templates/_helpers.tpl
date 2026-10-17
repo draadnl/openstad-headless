@@ -121,6 +121,10 @@ mysql-secret
 {{- printf "%s-%s" (include "openstad.fullname" .) .Values.image.name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
+{{- define "openstad.mcp.fullname" -}}
+{{- printf "%s-%s" (include "openstad.fullname" .) .Values.mcp.name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
 {{- define "openstad.image.secret.fullname" -}}
 {{- if not .Values.secrets.existingSecret -}}
 {{- printf "%s-image-secret" (include "openstad.fullname" .) | trunc 63 | trimSuffix "-" -}}
@@ -225,6 +229,14 @@ www.{{ .Values.host.base }}
 {{- define "openstad.image.url" -}}
 {{- if .Values.image.subdomain -}}
 {{- if .Values.host.usewww -}}www.{{- end -}}{{ .Values.image.subdomain }}.{{ .Values.host.base }}
+{{- else -}}
+{{- if .Values.host.usewww -}}www.{{- end -}}{{ .Values.host.base }}
+{{- end -}}
+{{- end -}}
+
+{{- define "openstad.mcp.url" -}}
+{{- if .Values.mcp.subdomain -}}
+{{- if .Values.host.usewww -}}www.{{- end -}}{{ .Values.mcp.subdomain }}.{{ .Values.host.base }}
 {{- else -}}
 {{- if .Values.host.usewww -}}www.{{- end -}}{{ .Values.host.base }}
 {{- end -}}
@@ -343,6 +355,13 @@ nginx
 
 {{/* image: security-headers + noindex + body-size-limit + compress */}}
 {{- define "openstad.traefik.middlewares.image" -}}
+{{- $ns := .Release.Namespace -}}
+{{- $fn := include "openstad.fullname" . -}}
+{{- printf "%s-%s-security-headers@kubernetescrd,%s-%s-security-headers-noindex@kubernetescrd,%s-%s-body-size-limit@kubernetescrd,%s-%s-compress-response@kubernetescrd" $ns $fn $ns $fn $ns $fn $ns $fn -}}
+{{- end -}}
+
+{{/* mcp: security-headers + noindex + body-size-limit + compress */}}
+{{- define "openstad.traefik.middlewares.mcp" -}}
 {{- $ns := .Release.Namespace -}}
 {{- $fn := include "openstad.fullname" . -}}
 {{- printf "%s-%s-security-headers@kubernetescrd,%s-%s-security-headers-noindex@kubernetescrd,%s-%s-body-size-limit@kubernetescrd,%s-%s-compress-response@kubernetescrd" $ns $fn $ns $fn $ns $fn $ns $fn -}}

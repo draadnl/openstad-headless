@@ -1,0 +1,14 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{ template "openstad.mcp.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: {{ .Values.mcp.label }}
+  ports:
+  - name: http
+    protocol: TCP
+    port: {{ .Values.mcp.service.httpPort }}
+  type: ClusterIP

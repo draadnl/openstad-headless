@@ -25,6 +25,7 @@ ALL_SERVICES=(
   openstad-image-server
   openstad-admin-server
   openstad-cms-server
+  openstad-mcp-server
 )
 
 # Parse arguments
