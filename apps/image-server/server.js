@@ -15,6 +15,19 @@ const crypto = require('crypto');
 const app = express();
 app.disable('x-powered-by');
 const imgSteam = require('image-steam');
+
+/**
+ * image-steam shares this sharp instance through the npm override, so these
+ * limits apply to resizes and HEIC uploads alike. sharp's defaults (50 MB cache,
+ * one thread per CPU) are sized for bigger pods than ours.
+ */
+const sharp = require('sharp');
+sharp.cache({
+  memory: Number(process.env.SHARP_CACHE_MB) || 16,
+  files: 10,
+  items: 50,
+});
+sharp.concurrency(Number(process.env.SHARP_CONCURRENCY) || 2);
 const multer = require('multer');
 const multerS3 = require('multer-s3');
 const s3 = require('./s3');
@@ -714,64 +727,120 @@ app.use((req, res, next) => {
 });
 
 /**
+ * Each in-flight multipart upload buffers roughly ~20 MiB of AWS SDK part
+ * buffers (partSize 5 MiB x queueSize 4), so unbounded concurrent uploads OOM
+ * the pod. Requests beyond MAX_CONCURRENT_UPLOADS wait in a FIFO queue for a
+ * slot. A slot holder releases on 'close', which fires on success, error and
+ * abort. A request that aborted while queued already emitted 'close', so it
+ * is skipped.
+ * ponytail: single global FIFO queue, no per-route fairness and no queue
+ * bound; add a queue cap returning 503 once queued uploads start hitting
+ * client or proxy timeouts.
+ */
+const MAX_CONCURRENT_UPLOADS = Number(process.env.MAX_CONCURRENT_UPLOADS) || 4;
+let activeUploads = 0;
+const uploadQueue = [];
+const runNextUpload = () => {
+  const nextRun = uploadQueue.shift();
+  if (nextRun) nextRun();
+};
+const uploadSlot = (req, res, next) => {
+  const run = () => {
+    if (res.closed || res.writableEnded || req.destroyed)
+      return runNextUpload();
+    activeUploads++;
+    res.once('close', () => {
+      activeUploads--;
+      runNextUpload();
+    });
+    next();
+  };
+  if (activeUploads < MAX_CONCURRENT_UPLOADS) {
+    run();
+  } else {
+    uploadQueue.push(run);
+    console.warn('Upload queued', {
+      active: activeUploads,
+      queued: uploadQueue.length,
+    });
+  }
+};
+
+/**
  *  The url for creating one Image
  */
-app.post('/image', imageUpload.single('image'), (req, res, next) => {
-  const url = getFileUrl(req.file, 'image');
+app.post(
+  '/image',
+  uploadSlot,
+  imageUpload.single('image'),
+  (req, res, next) => {
+    const url = getFileUrl(req.file, 'image');
 
-  let protocol = '';
+    let protocol = '';
 
-  if (!url.startsWith('http://') && !url.startsWith('https://')) {
-    protocol = process.env.FORCE_HTTP ? 'http://' : 'https://';
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      protocol = process.env.FORCE_HTTP ? 'http://' : 'https://';
+    }
+
+    res.json({
+      name: sanitizeFileName(req.file.originalname),
+      url: protocol + url,
+    });
   }
+);
 
-  res.json({
-    name: sanitizeFileName(req.file.originalname),
-    url: protocol + url,
-  });
-});
+app.post(
+  '/images',
+  uploadSlot,
+  imageUpload.array('image', 30),
+  (req, res, next) => {
+    res.json(
+      req.files.map((file) => {
+        const url = getFileUrl(file, 'image');
 
-app.post('/images', imageUpload.array('image', 30), (req, res, next) => {
-  res.json(
-    req.files.map((file) => {
-      const url = getFileUrl(file, 'image');
+        let protocol = '';
 
-      let protocol = '';
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+          protocol = process.env.FORCE_HTTP ? 'http://' : 'https://';
+        }
 
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        protocol = process.env.FORCE_HTTP ? 'http://' : 'https://';
-      }
-
-      return {
-        name: sanitizeFileName(file.originalname),
-        url: protocol + url,
-      };
-    })
-  );
-});
+        return {
+          name: sanitizeFileName(file.originalname),
+          url: protocol + url,
+        };
+      })
+    );
+  }
+);
 
 /**
  *  The url for creating one Document
  */
-app.post('/document', documentUpload.single('document'), (req, res, next) => {
-  const url = getFileUrl(req.file, 'document');
+app.post(
+  '/document',
+  uploadSlot,
+  documentUpload.single('document'),
+  (req, res, next) => {
+    const url = getFileUrl(req.file, 'document');
 
-  let protocol = '';
+    let protocol = '';
 
-  if (!url.startsWith('http://') && !url.startsWith('https://')) {
-    protocol = process.env.FORCE_HTTP ? 'http://' : 'https://';
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      protocol = process.env.FORCE_HTTP ? 'http://' : 'https://';
+    }
+
+    res.json({
+      name: sanitizeFileName(req.file.originalname),
+      url: protocol + url,
+      size: req.file.size,
+      mimeType: req.file.mimetype,
+    });
   }
-
-  res.json({
-    name: sanitizeFileName(req.file.originalname),
-    url: protocol + url,
-    size: req.file.size,
-    mimeType: req.file.mimetype,
-  });
-});
+);
 
 app.post(
   '/documents',
+  uploadSlot,
   documentUpload.array('document', 30),
   (req, res, next) => {
     res.json(
