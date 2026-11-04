@@ -394,19 +394,26 @@ image:
   # parameters to enable throttling: https://github.com/asilvas/node-image-steam?tab=readme-ov-file#throttle-options
   throttle:
     enabled: true
+    # Number of concurrent image processing operations (each holds a libvips working set in memory)
+    ccProcessors: 2
     # Number of concurrent storage request operations. This helps prevent saturation of your storage and/or networking interfaces to provide the optimal experience
-    ccProcessors: 4
-    # Number of concurrent storage request operations. This helps prevent saturation of your storage and/or networking interfaces to provide the optimal experience
-    ccPrefetcher: 20
+    ccPrefetcher: 4
     # Number of concurrent http requests. Anything to exceed this value will result in a 503 (too busy), to avoid an indefinite pileup
     ccRequests: 100
   hqOriginalMaxPixels: 160000
+  # Caps server-side HEIC decode; one 13 MP decode peaks around 330 MB RSS in a bare Node process, so it must fit the pod memory limit
+  heicMaxMegapixels: 13
   disableWebpConversion: false
   # OpenTelemetry (env: OTEL_SERVICE_NAME, OTEL_EXPORTER_OTLP_ENDPOINT) - override per deployment
   otelServiceName: openstad-image-server
   otelExporterOtlpEndpoint: http://openstad-otel-collector:4317
   # Inject extra environment variables
-  extraEnvVars: []
+  # Overriding this list in an installation's own values replaces it entirely and drops these memory defaults
+  extraEnvVars:
+    - name: NODE_OPTIONS
+      value: '--max-old-space-size=256 --max-semi-space-size=16'
+    - name: MALLOC_ARENA_MAX
+      value: '2'
   # Resources:
   resources:
     # Max resources

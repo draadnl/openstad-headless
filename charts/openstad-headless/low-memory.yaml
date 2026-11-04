@@ -59,6 +59,9 @@ image:
   extraEnvVars:
     - name: NODE_OPTIONS
       value: '--max-old-space-size=128 --max-semi-space-size=8'
+    - name: MALLOC_ARENA_MAX
+      value: '2'
+  heicMaxMegapixels: 4
   resources:
     limits:
       memory: 256Mi
