@@ -1,3 +1,4 @@
+import { find } from 'filepond';
 import React from 'react';
 
 import ImageUploadField from '../../src/form-elements/image-upload';
@@ -5,6 +6,18 @@ import ImageUploadField from '../../src/form-elements/image-upload';
 const TYPE_NOT_ALLOWED = 'Bestandstype is niet toegestaan';
 
 const IMAGE_SERVER = 'http://image.test';
+
+/**
+ * The test browser cannot decode HEIC natively and the fixtures hold no real
+ * image data, so client-side conversion fails and the original is uploaded
+ * as-is for the image server to convert.
+ */
+const expectHeicUploadedAsIs = (fileName: string) => {
+  cy.wait('@upload');
+  cy.get('@upload.all').should('have.length', 1);
+  cy.get('.filepond--file-info-main').should('contain', fileName);
+  cy.get('.filepond--root').should('not.contain', TYPE_NOT_ALLOWED);
+};
 
 const file = (fileName: string, mimeType: string) => ({
   contents: Cypress.Buffer.from('niet echt beeld, alleen naam en type tellen'),
@@ -81,24 +94,72 @@ describe('ImageUploadField file picker type validation', () => {
     mountField();
     pickFile('IMG_1234.heic', 'image/heic');
 
-    cy.get('.filepond--item').should('exist');
-    cy.get('.filepond--root').should('not.contain', TYPE_NOT_ALLOWED);
+    expectHeicUploadedAsIs('IMG_1234.heic');
   });
 
   it('accepts a heic when the browser reports no type at all', () => {
     mountField();
     pickFileWithoutType('IMG_1234.heic');
 
-    cy.get('.filepond--item').should('exist');
-    cy.get('.filepond--root').should('not.contain', TYPE_NOT_ALLOWED);
+    expectHeicUploadedAsIs('IMG_1234.heic');
   });
 
   it('accepts a heif when the browser reports no type at all', () => {
     mountField();
     pickFileWithoutType('IMG_1234.heif');
 
-    cy.get('.filepond--item').should('exist');
-    cy.get('.filepond--root').should('not.contain', TYPE_NOT_ALLOWED);
+    expectHeicUploadedAsIs('IMG_1234.heif');
+  });
+
+  it('uploads a natively decodable heic as jpeg', () => {
+    mountField();
+    cy.window().then((win) => {
+      const decode = win.createImageBitmap.bind(win);
+      cy.stub(win, 'createImageBitmap').callsFake(() =>
+        decode(new win.ImageData(8, 6))
+      );
+    });
+    pickFile('IMG_1234.heic', 'image/heic');
+
+    cy.wait('@upload')
+      .its('request.body')
+      .then((body) => {
+        const text =
+          typeof body === 'string' ? body : new TextDecoder().decode(body);
+        expect(text).to.contain('Content-Type: image/jpeg');
+      });
+    cy.get('@upload.all').should('have.length', 1);
+    cy.get('.filepond--file-info-main')
+      .should('contain', 'IMG_1234.jpg')
+      .and('not.contain', 'IMG_1234.heic');
+  });
+
+  it('drops the conversion result of a heic removed while converting', () => {
+    let finishDecode = () => {};
+    mountField();
+    cy.window().then((win) => {
+      const decode = win.createImageBitmap.bind(win);
+      cy.stub(win, 'createImageBitmap')
+        .as('decode')
+        .callsFake(
+          () =>
+            new Promise((resolve) => {
+              finishDecode = () => resolve(decode(new win.ImageData(8, 6)));
+            })
+        );
+    });
+    pickFile('IMG_1234.heic', 'image/heic');
+
+    cy.get('@decode').should('have.been.called');
+    cy.get('.filepond--root').then(($root) => {
+      find($root[0])?.removeFiles();
+    });
+    cy.get('.filepond--item').should('not.exist');
+    cy.then(() => finishDecode());
+
+    cy.wait(1000);
+    cy.get('@upload.all').should('have.length', 0);
+    cy.get('.filepond--root').should('not.contain', 'IMG_1234.jpg');
   });
 
   it('refuses a document', () => {
@@ -121,8 +182,7 @@ describe('ImageUploadField drop type validation', () => {
     mountField();
     dropFile('IMG_1234.heic', 'image/heic');
 
-    cy.get('.filepond--item').should('exist');
-    cy.get('.filepond--root').should('not.contain', TYPE_NOT_ALLOWED);
+    expectHeicUploadedAsIs('IMG_1234.heic');
   });
 
   it('refuses a dropped document', () => {

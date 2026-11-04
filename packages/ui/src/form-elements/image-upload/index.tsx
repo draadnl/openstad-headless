@@ -14,6 +14,7 @@ import {
   Paragraph,
 } from '@utrecht/component-library-react';
 import {
+  ActualFileObject,
   FilePondErrorDescription,
   FilePondFile,
   FilePondInitialFile,
@@ -76,6 +77,41 @@ const detectFileType = (source: File, type: string): Promise<string> =>
     }
     resolve(MIME_BY_EXTENSION[getFileExtension(source.name)] || UNKNOWN_TYPE);
   });
+
+const isHeicFile = (file: ActualFileObject) =>
+  ['heic', 'heif'].includes(getFileExtension(file.name)) ||
+  /heic|heif/i.test(file.type);
+
+const HEIC_MAX_SIDE = 4096;
+const HEIC_JPEG_QUALITY = 0.9;
+
+/** Decodes HEIC/HEIF with the browser's native decoder and re-encodes it as JPEG. */
+const convertHeicToJpeg = async (file: ActualFileObject): Promise<File> => {
+  const bitmap = await createImageBitmap(file, {
+    imageOrientation: 'from-image',
+  });
+  const canvas = document.createElement('canvas');
+  try {
+    const scale = Math.min(
+      1,
+      HEIC_MAX_SIDE / Math.max(bitmap.width, bitmap.height)
+    );
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Canvas 2D context unavailable');
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  } finally {
+    bitmap.close();
+  }
+  const jpeg = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, 'image/jpeg', HEIC_JPEG_QUALITY)
+  );
+  canvas.width = canvas.height = 0;
+  if (!jpeg) throw new Error('JPEG encoding failed');
+  const name = file.name.replace(/\.[^.]*$/, '') + '.jpg';
+  return new File([jpeg], name, { type: 'image/jpeg' });
+};
 
 const filePondSettings = {
   labelIdle: 'Upload hier uw bestand(en)',
@@ -229,6 +265,7 @@ const ImageUploadField: FC<ImageUploadProps> = ({
   >([]);
   const cropTarget = cropQueue[0] || null;
   const pondRef = useRef<any>(null);
+  const conversionChain = useRef<Promise<unknown>>(Promise.resolve());
   const cropOpenerRef = useRef<HTMLElement | null>(null);
 
   const advanceCropQueue = () => {
@@ -534,7 +571,22 @@ const ImageUploadField: FC<ImageUploadProps> = ({
               : acceptAttribute
           }
           fileValidateTypeDetectType={detectFileType}
-          beforeAddFile={(fileItem) => {
+          beforeAddFile={async (fileItem) => {
+            if (isHeicFile(fileItem.file)) {
+              const run = conversionChain.current.then(() =>
+                convertHeicToJpeg(fileItem.file)
+              );
+              conversionChain.current = run.catch(() => {});
+              const converted = await run.catch(() => null);
+              const stillActive = pondRef.current
+                ?.getFiles()
+                ?.some((item: FilePondFile) => item.id === fileItem.id);
+              if (!stillActive) return false;
+              if (converted) {
+                pondRef.current?.addFile(converted).catch(() => {});
+                return false;
+              }
+            }
             return new Promise<boolean>((resolve, reject) => {
               if (fileItem.file.size > maxBytes) {
                 reject(
