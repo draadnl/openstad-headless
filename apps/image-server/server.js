@@ -727,17 +727,25 @@ app.use((req, res, next) => {
 });
 
 /**
- * Each in-flight multipart upload buffers roughly ~20 MiB of AWS SDK part
+ * Each in-flight multipart upload buffers ~20 MiB of AWS SDK part
  * buffers (partSize 5 MiB x queueSize 4), so unbounded concurrent uploads OOM
  * the pod. Requests beyond MAX_CONCURRENT_UPLOADS wait in a FIFO queue for a
  * slot. A slot holder releases on 'close', which fires on success, error and
  * abort. A request that aborted while queued already emitted 'close', so it
- * is skipped.
- * ponytail: single global FIFO queue, no per-route fairness and no queue
- * bound; add a queue cap returning 503 once queued uploads start hitting
- * client or proxy timeouts.
+ * is skipped. Beyond MAX_QUEUED_UPLOADS requests get a 503, and a slot held
+ * longer than UPLOAD_SLOT_TIMEOUT_MS (below Node's 300 s requestTimeout) is
+ * reclaimed by destroying the response and its socket, which also covers a
+ * fully received body stuck in a stalled storage upload.
+ * ponytail: no per-client fairness, one client can occupy all slots within
+ * the timeout window. The slot frees on response close while an aborted S3
+ * multipart upload may hold its part buffers a moment longer; wrapping the
+ * storage engine for that sub-second window is not worth a second release
+ * path.
  */
 const MAX_CONCURRENT_UPLOADS = Number(process.env.MAX_CONCURRENT_UPLOADS) || 4;
+const MAX_QUEUED_UPLOADS = Number(process.env.MAX_QUEUED_UPLOADS) || 50;
+const UPLOAD_SLOT_TIMEOUT_MS =
+  Number(process.env.UPLOAD_SLOT_TIMEOUT_MS) || 240000;
 let activeUploads = 0;
 const uploadQueue = [];
 const runNextUpload = () => {
@@ -749,7 +757,13 @@ const uploadSlot = (req, res, next) => {
     if (res.closed || res.writableEnded || req.destroyed)
       return runNextUpload();
     activeUploads++;
+    const deadline = setTimeout(
+      () => res.destroy(new Error('Upload slot timeout')),
+      UPLOAD_SLOT_TIMEOUT_MS
+    );
+    deadline.unref();
     res.once('close', () => {
+      clearTimeout(deadline);
       activeUploads--;
       runNextUpload();
     });
@@ -757,6 +771,12 @@ const uploadSlot = (req, res, next) => {
   };
   if (activeUploads < MAX_CONCURRENT_UPLOADS) {
     run();
+  } else if (uploadQueue.length >= MAX_QUEUED_UPLOADS) {
+    console.warn('Upload rejected, queue full', { queued: uploadQueue.length });
+    res
+      .status(503)
+      .set('Retry-After', '10')
+      .json({ error: 'Too many concurrent uploads. Try again shortly.' });
   } else {
     uploadQueue.push(run);
     console.warn('Upload queued', {

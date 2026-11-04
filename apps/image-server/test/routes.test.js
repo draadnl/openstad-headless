@@ -12,7 +12,6 @@ const SERVER_PATH = fileURLToPath(new URL('../server.js', import.meta.url));
 
 let BASE_URL;
 let serverProcess;
-let serverStderr = '';
 let workDir;
 let jpeg;
 let uploadedImageName;
@@ -33,21 +32,62 @@ const pdf = Buffer.from(
   '%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n'
 );
 
-/** Poll GET /health until the server answers or the deadline passes. */
-const waitForHealth = async (deadline) => {
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Spawn server.js with extra env and poll GET /health until it answers. */
+const startServer = async (env = {}) => {
+  const port = await getFreePort();
+  const baseUrl = `http://localhost:${port}`;
+  const proc = spawn(process.execPath, [SERVER_PATH], {
+    cwd: workDir,
+    env: {
+      ...process.env,
+      PORT_API: String(port),
+      APP_URL: `localhost:${port}`,
+      IMAGES_DIR: path.join(workDir, 'images') + '/',
+      DOCUMENTS_DIR: path.join(workDir, 'documents') + '/',
+      IMAGE_VERIFICATION_TOKEN: TOKEN,
+      MAX_FILE_UPLOAD_SIZE_MB: '1',
+      S3_ENDPOINT: '',
+      ...env,
+    },
+    stdio: ['ignore', 'ignore', 'pipe'],
+  });
+  let stderr = '';
+  proc.stderr.on('data', (chunk) => {
+    stderr += chunk;
+  });
+
+  const deadline = Date.now() + 15000;
   while (Date.now() < deadline) {
-    if (serverProcess.exitCode !== null || serverProcess.signalCode) {
+    if (proc.exitCode !== null || proc.signalCode) {
       throw new Error(
-        `Server exited early with code ${serverProcess.exitCode}, signal ${serverProcess.signalCode}\n${serverStderr}`
+        `Server exited early with code ${proc.exitCode}, signal ${proc.signalCode}\n${stderr}`
       );
     }
     try {
-      const response = await fetch(`${BASE_URL}/health`);
-      if (response.ok) return;
+      const response = await fetch(`${baseUrl}/health`);
+      if (response.ok) return { proc, baseUrl };
     } catch {}
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await sleep(100);
   }
+  proc.kill();
   throw new Error('Server did not become healthy in time');
+};
+
+/** Open a raw POST /image whose multipart body never completes. */
+const openPartialUpload = (baseUrl) => {
+  const boundary = 'XBOUNDARY';
+  const partHead = `--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="a.jpg"\r\nContent-Type: image/jpeg\r\n\r\n`;
+  const length = Buffer.byteLength(partHead) + jpeg.length + 64;
+  const socket = net.connect(Number(new URL(baseUrl).port), 'localhost');
+  socket.on('error', () => {});
+  // Drain responses so a server-side close surfaces as 'close' on this socket.
+  socket.resume();
+  socket.write(
+    `POST /image HTTP/1.1\r\nHost: localhost\r\nimage-token: ${TOKEN}\r\nContent-Type: multipart/form-data; boundary=${boundary}\r\nContent-Length: ${length}\r\n\r\n${partHead}`
+  );
+  return socket;
 };
 
 const formWith = (field, files) => {
@@ -58,8 +98,8 @@ const formWith = (field, files) => {
   return form;
 };
 
-const upload = (route, form, signal) =>
-  fetch(`${BASE_URL}${route}`, {
+const upload = (route, form, signal, baseUrl = BASE_URL) =>
+  fetch(`${baseUrl}${route}`, {
     method: 'POST',
     headers: { 'image-token': TOKEN },
     body: form,
@@ -79,29 +119,9 @@ beforeAll(async () => {
   await mkdir(path.join(workDir, 'images'));
   await mkdir(path.join(workDir, 'documents'));
 
-  const port = await getFreePort();
-  BASE_URL = `http://localhost:${port}`;
-
-  serverProcess = spawn(process.execPath, [SERVER_PATH], {
-    cwd: workDir,
-    env: {
-      ...process.env,
-      PORT_API: String(port),
-      APP_URL: `localhost:${port}`,
-      IMAGES_DIR: path.join(workDir, 'images') + '/',
-      DOCUMENTS_DIR: path.join(workDir, 'documents') + '/',
-      IMAGE_VERIFICATION_TOKEN: TOKEN,
-      MAX_FILE_UPLOAD_SIZE_MB: '1',
-      MAX_CONCURRENT_UPLOADS: '2',
-      S3_ENDPOINT: '',
-    },
-    stdio: ['ignore', 'ignore', 'pipe'],
-  });
-  serverProcess.stderr.on('data', (chunk) => {
-    serverStderr += chunk;
-  });
-
-  await waitForHealth(Date.now() + 15000);
+  const server = await startServer({ MAX_CONCURRENT_UPLOADS: '2' });
+  serverProcess = server.proc;
+  BASE_URL = server.baseUrl;
 }, 20000);
 
 afterAll(async () => {
@@ -187,23 +207,10 @@ test('POST /image queues uploads beyond the concurrency cap and completes them a
 });
 
 test('an upload aborted while queued does not leak its slot', async () => {
-  const boundary = 'XBOUNDARY';
-  const partHead = `--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="a.jpg"\r\nContent-Type: image/jpeg\r\n\r\n`;
-  const length = Buffer.byteLength(partHead) + jpeg.length + 64;
-  const openPartialUpload = () => {
-    const socket = net.connect(Number(new URL(BASE_URL).port), 'localhost');
-    socket.on('error', () => {});
-    socket.write(
-      `POST /image HTTP/1.1\r\nHost: localhost\r\nimage-token: ${TOKEN}\r\nContent-Type: multipart/form-data; boundary=${boundary}\r\nContent-Length: ${length}\r\n\r\n${partHead}`
-    );
-    return socket;
-  };
-  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
   // Two holders take both slots, two more requests queue and then abort.
-  const holders = [openPartialUpload(), openPartialUpload()];
+  const holders = [openPartialUpload(BASE_URL), openPartialUpload(BASE_URL)];
   await sleep(200);
-  const queued = [openPartialUpload(), openPartialUpload()];
+  const queued = [openPartialUpload(BASE_URL), openPartialUpload(BASE_URL)];
   await sleep(200);
   for (const socket of queued) socket.destroy();
   await sleep(200);
@@ -221,6 +228,65 @@ test('an upload aborted while queued does not leak its slot', async () => {
   );
   expect(response.status).toBe(200);
 }, 5000);
+
+test('uploads beyond the queue cap get a 503 with Retry-After', async () => {
+  const { proc, baseUrl } = await startServer({
+    MAX_CONCURRENT_UPLOADS: '1',
+    MAX_QUEUED_UPLOADS: '1',
+  });
+  const sockets = [];
+  try {
+    sockets.push(openPartialUpload(baseUrl));
+    await sleep(200);
+    sockets.push(openPartialUpload(baseUrl));
+    await sleep(200);
+
+    const response = await upload(
+      '/image',
+      formWith('image', [
+        { buffer: jpeg, type: 'image/jpeg', name: 'rejected.jpg' },
+      ]),
+      AbortSignal.timeout(2000),
+      baseUrl
+    );
+    expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('10');
+    expect((await response.json()).error).toMatch(
+      /Too many concurrent uploads/
+    );
+  } finally {
+    for (const socket of sockets) socket.destroy();
+    proc.kill();
+  }
+}, 20000);
+
+test('a slot held past the deadline is reclaimed', async () => {
+  const { proc, baseUrl } = await startServer({
+    MAX_CONCURRENT_UPLOADS: '1',
+    UPLOAD_SLOT_TIMEOUT_MS: '500',
+  });
+  const holder = openPartialUpload(baseUrl);
+  try {
+    const holderClosed = new Promise((resolve) =>
+      holder.once('close', resolve)
+    );
+    await Promise.race([holderClosed, sleep(2000)]);
+    expect(holder.destroyed).toBe(true);
+
+    const response = await upload(
+      '/image',
+      formWith('image', [
+        { buffer: jpeg, type: 'image/jpeg', name: 'after-deadline.jpg' },
+      ]),
+      AbortSignal.timeout(3000),
+      baseUrl
+    );
+    expect(response.status).toBe(200);
+  } finally {
+    holder.destroy();
+    proc.kill();
+  }
+}, 20000);
 
 test('POST /images stores multiple images', async () => {
   const response = await upload(
