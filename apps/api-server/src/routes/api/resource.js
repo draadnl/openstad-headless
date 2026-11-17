@@ -25,6 +25,7 @@ const resourceLinkRequests = require('../../services/resource-link-requests');
 const {
   restrictModeratorOnlyBody,
 } = require('../../lib/restrict-moderator-only-body');
+const { filterResourceCreateBody } = require('../../lib/resource-create-body');
 const {
   snapshotModBreakIds,
   snapshotModBreakDescriptions,
@@ -495,6 +496,10 @@ router
     }
 
     req.body = removeSpamMetaFields(req.body);
+    // Only keep fields that may be set on create; anything else (sort, score,
+    // createdAt, fields added later, ...) is dropped instead of falling back
+    // to the model-level createableBy.
+    req.body = filterResourceCreateBody(req.body, req.user);
     if (req.isSpamSubmission) {
       req.body.publishDate = null;
     }
