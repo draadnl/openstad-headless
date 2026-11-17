@@ -31,6 +31,7 @@ const {
 const {
   HEIC_EXTENSIONS,
   HEIC_TOO_MANY_PIXELS,
+  HEIC_NOT_ENOUGH_MEMORY,
   convertHeicToJpeg,
   looksLikeHeicUpload,
   replaceExtension,
@@ -76,6 +77,8 @@ async function detectImageMimeType(response, extension) {
   return ct && ct.startsWith('image/') ? ct : 'application/octet-stream';
 }
 const { resolveMaxUploadSizeMb } = require('./max-upload-size');
+const { resolveMaxInputPixels, resolveThrottle } = require('./memory-settings');
+const sharp = require('sharp');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('path');
@@ -111,7 +114,9 @@ const unsupportedImageTypeError = (message) => {
 
 const heicConversionFailedError = (cause) =>
   unsupportedImageTypeError(
-    cause && cause.code === HEIC_TOO_MANY_PIXELS
+    cause &&
+      (cause.code === HEIC_TOO_MANY_PIXELS ||
+        cause.code === HEIC_NOT_ENOUGH_MEMORY)
       ? `${cause.message} The image was not stored.`
       : 'This file could not be read as a HEIC image and was not stored.'
   );
@@ -237,6 +242,11 @@ if (s3.isEnabled()) {
 
 const disableWebpSupport = process.env.DISABLE_WEBP_CONVERSION === 'true';
 
+// libvips keeps recently used operations and their pixel buffers around (up to
+// 50 MB). Every resize here is a one-off whose result is cached on disk, so that
+// memory is never reused; turn the cache off.
+sharp.cache(false);
+
 const imageSteamConfig = {
   storage: {
     defaults: {
@@ -248,11 +258,7 @@ const imageSteamConfig = {
       cacheArtifacts: process.env.CACHE_ARTIFACTS || true,
     },
   },
-  throttle: {
-    ccProcessors: process.env.THROTTLE_CC_PROCESSORS || 4,
-    ccPrefetchers: process.env.THROTTLE_CC_PREFETCHER || 20,
-    ccRequests: process.env.THROTTLE_CC_REQUESTS || 100,
-  },
+  throttle: resolveThrottle(),
   log: {
     errors: true,
   },
@@ -272,9 +278,14 @@ const imageSteamConfig = {
   },
   processor: {
     sharp: {
+      // Also passed here in case image-steam resolves its own copy of sharp
+      cache: false,
       defaults: {
         // Fix for Samsung S9 JPG's
         failOnError: false,
+        limitInputPixels: resolveMaxInputPixels(
+          process.env.IMAGE_MAX_INPUT_MEGAPIXELS
+        ),
       },
     },
   },

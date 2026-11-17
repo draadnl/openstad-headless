@@ -269,10 +269,12 @@ async function setupEnvVars() {
 
   process.env.IMAGE_IMAGES_DIR = process.env.IMAGE_IMAGES_DIR || '';
   process.env.IMAGE_THROTTLE = process.env.IMAGE_THROTTLE || true;
+  // Kept low on purpose: these two decide the peak memory use of the image
+  // server, see MEMORY_WINS.md.
   process.env.IMAGE_THROTTLE_CC_PROCESSORS =
-    process.env.IMAGE_THROTTLE_CC_PROCESSORS || 4;
+    process.env.IMAGE_THROTTLE_CC_PROCESSORS || 2;
   process.env.IMAGE_THROTTLE_CC_PREFETCHER =
-    process.env.IMAGE_THROTTLE_CC_PREFETCHER || 20;
+    process.env.IMAGE_THROTTLE_CC_PREFETCHER || 4;
   process.env.IMAGE_THROTTLE_CC_REQUESTS =
     process.env.IMAGE_THROTTLE_CC_REQUESTS || 100;
 

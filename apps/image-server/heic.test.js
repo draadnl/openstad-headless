@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import sharp from 'sharp';
 import { expect, test } from 'vitest';
 
 import {
@@ -5,7 +8,9 @@ import {
   HEIC_MAX_MEGAPIXELS,
   HEIC_MIME_TYPES,
   HEIC_TOO_MANY_PIXELS,
+  HEIC_UNREADABLE,
   convertHeicToJpeg,
+  getConvertibleMegapixels,
   looksLikeHeicUpload,
   maxPixelsFromIspeBoxes,
   replaceExtension,
@@ -106,4 +111,68 @@ test('convertHeicToJpeg refuses input without heic dimensions', async () => {
   await expect(
     convertHeicToJpeg(Buffer.from('geen heic bestand'))
   ).rejects.toThrow();
+});
+
+const MB = 1024 * 1024;
+const sampleHeic = () =>
+  readFileSync(path.join(__dirname, 'test-fixtures', 'sample-64x48.heic'));
+
+test('convertHeicToJpeg turns a real heic file into a jpeg of the same size', async () => {
+  const jpeg = await convertHeicToJpeg(sampleHeic());
+  const metadata = await sharp(jpeg).metadata();
+
+  expect(metadata.format).toBe('jpeg');
+  expect(metadata.width).toBe(64);
+  expect(metadata.height).toBe(48);
+});
+
+test('convertHeicToJpeg handles conversions that arrive at the same time', async () => {
+  const results = await Promise.all([
+    convertHeicToJpeg(sampleHeic()),
+    convertHeicToJpeg(sampleHeic()),
+    convertHeicToJpeg(sampleHeic()),
+  ]);
+
+  for (const jpeg of results) {
+    expect(jpeg.subarray(0, 2)).toEqual(Buffer.from([0xff, 0xd8]));
+  }
+});
+
+test('convertHeicToJpeg rejects a truncated heic file without crashing', async () => {
+  const truncated = sampleHeic().subarray(0, 400);
+
+  await expect(convertHeicToJpeg(truncated)).rejects.toMatchObject({
+    code: HEIC_UNREADABLE,
+  });
+});
+
+test('getConvertibleMegapixels is unlimited without a memory limit', () => {
+  expect(getConvertibleMegapixels({ limitBytes: 0, usedBytes: 100 * MB })).toBe(
+    Infinity
+  );
+});
+
+test('getConvertibleMegapixels refuses a 24 megapixel photo in a 500 MB container', () => {
+  const megapixels = getConvertibleMegapixels({
+    limitBytes: 500 * MB,
+    usedBytes: 150 * MB,
+  });
+
+  expect(megapixels).toBeGreaterThan(12.2);
+  expect(megapixels).toBeLessThan(24.5);
+});
+
+test('getConvertibleMegapixels accepts the largest allowed photo in a 1 GiB container', () => {
+  const megapixels = getConvertibleMegapixels({
+    limitBytes: 1024 * MB,
+    usedBytes: 150 * MB,
+  });
+
+  expect(megapixels).toBeGreaterThan(HEIC_MAX_MEGAPIXELS);
+});
+
+test('getConvertibleMegapixels never goes below zero', () => {
+  expect(
+    getConvertibleMegapixels({ limitBytes: 500 * MB, usedBytes: 490 * MB })
+  ).toBe(0);
 });
