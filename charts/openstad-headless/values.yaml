@@ -392,15 +392,28 @@ image:
       secretName: openstad-tls-image
       hosts: []
   # parameters to enable throttling: https://github.com/asilvas/node-image-steam?tab=readme-ov-file#throttle-options
+  # These two throttle values decide the peak memory use of resizing, see MEMORY_WINS.md before raising them.
   throttle:
     enabled: true
-    # Number of concurrent storage request operations. This helps prevent saturation of your storage and/or networking interfaces to provide the optimal experience
-    ccProcessors: 4
-    # Number of concurrent storage request operations. This helps prevent saturation of your storage and/or networking interfaces to provide the optimal experience
-    ccPrefetcher: 20
+    # Number of images decoded and resized at the same time. Each one can take 100-300 MB for a large photo.
+    ccProcessors: 2
+    # Number of image requests handled at the same time. Each one holds the complete original file in memory.
+    ccPrefetcher: 4
     # Number of concurrent http requests. Anything to exceed this value will result in a 503 (too busy), to avoid an indefinite pileup
     ccRequests: 100
   hqOriginalMaxPixels: 160000
+  # Images with more megapixels than this are not resized (env: IMAGE_MAX_INPUT_MEGAPIXELS).
+  # Protects against small files that decode to a huge image.
+  maxInputMegapixels: 120
+  # Limits the number of glibc malloc arenas (env: MALLOC_ARENA_MAX). Without it the memory freed
+  # by image processing is not returned to the system and the pod creeps towards its limit.
+  mallocArenaMax: 2
+  # Start node directly instead of through `npm run start`: the npm process that otherwise stays
+  # around as parent takes about 60 MB of the memory limit.
+  customCommand:
+    - node
+    - server.js
+  customWorkingDir: /opt/openstad-headless/apps/image-server
   disableWebpConversion: false
   maxFileUploadSizeMB: 25
   # OpenTelemetry (env: OTEL_SERVICE_NAME, OTEL_EXPORTER_OTLP_ENDPOINT) - override per deployment
@@ -411,8 +424,11 @@ image:
   # Resources:
   resources:
     # Max resources
+    # Converting an iPhone HEIC photo needs about 13 MB per megapixel: 400 MB for the default
+    # 24 megapixels and 650 MB for 48. With less than 1Gi the image server refuses the largest photos
+    # (it checks the limit before converting) instead of being OOM-killed.
     limits:
-      memory: 500M
+      memory: 1Gi
     # Min resources
     requests:
       cpu: 100m

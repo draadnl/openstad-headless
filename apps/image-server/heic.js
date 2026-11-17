@@ -1,3 +1,6 @@
+const os = require('node:os');
+const path = require('node:path');
+const { Worker } = require('node:worker_threads');
 const sharp = require('sharp');
 
 /**
@@ -23,6 +26,7 @@ const HEIC_JPEG_QUALITY = 90;
 
 const HEIC_UNREADABLE = 'HEIC_UNREADABLE';
 const HEIC_TOO_MANY_PIXELS = 'HEIC_TOO_MANY_PIXELS';
+const HEIC_NOT_ENOUGH_MEMORY = 'HEIC_NOT_ENOUGH_MEMORY';
 
 /**
  * HEIC compresses so well that the upload size limit says nothing about the
@@ -33,11 +37,27 @@ const HEIC_TOO_MANY_PIXELS = 'HEIC_TOO_MANY_PIXELS';
 const HEIC_MAX_MEGAPIXELS = Number(process.env.HEIC_MAX_MEGAPIXELS) || 50;
 
 /**
- * A single 48 megapixel conversion peaks around 800 MB of resident memory, so
+ * A single 48 megapixel conversion peaks around 650 MB of resident memory, so
  * conversions run one at a time unless configured otherwise.
  */
 const maxConcurrentConversions =
   Number(process.env.HEIC_MAX_CONCURRENT_CONVERSIONS) || 1;
+
+/**
+ * Peak resident memory of a conversion, measured at 12, 24 and 48 megapixels:
+ * roughly 13 MB per megapixel (the WebAssembly heap of libheif plus the raw
+ * RGBA copy handed back by the worker). Rounded up, because an estimate that is
+ * too low ends in the container being OOM-killed, which also takes down every
+ * other upload in flight.
+ */
+const HEIC_BYTES_PER_PIXEL = 14;
+
+/**
+ * Memory kept free for the fixed cost of a conversion (worker thread and
+ * WebAssembly module, about 35 MB) and for everything else the server is doing
+ * at that moment.
+ */
+const HEIC_MEMORY_HEADROOM_BYTES = 64 * 1024 * 1024;
 
 const ISPE_BOX_SIZE = 20;
 const ISPE_MARKER = Buffer.from('ispe');
@@ -107,17 +127,78 @@ const replaceExtension = (fileName, extension) => {
   return `${base}.${extension}`;
 };
 
-let decodeHeic = null;
+/**
+ * Memory limit of the container (cgroup) in bytes, or 0 when there is none or
+ * it cannot be determined. Older Node versions report "no limit" as a huge
+ * number instead of 0.
+ */
+const getMemoryLimitBytes = () => {
+  if (typeof process.constrainedMemory !== 'function') return 0;
+  const limit = Number(process.constrainedMemory());
+  if (!Number.isFinite(limit) || limit <= 0 || limit > os.totalmem()) return 0;
+  return limit;
+};
 
 /**
- * Loading the WebAssembly module costs about 30 ms and 27 MB of resident
- * memory, so instances that never receive a HEIC should not pay for it.
+ * Megapixels that can be decoded right now without running into the memory
+ * limit of the container, or Infinity when no limit is known. Refusing one
+ * upload with a readable message beats the kernel killing the whole process.
  */
-const getDecoder = () => {
-  if (!decodeHeic) {
-    decodeHeic = require('heic-decode');
+const getConvertibleMegapixels = ({
+  limitBytes = getMemoryLimitBytes(),
+  usedBytes = process.memoryUsage.rss(),
+} = {}) => {
+  if (!limitBytes) return Infinity;
+  const availableBytes = limitBytes - usedBytes - HEIC_MEMORY_HEADROOM_BYTES;
+  return Math.max(0, availableBytes / HEIC_BYTES_PER_PIXEL / 1e6);
+};
+
+/**
+ * Decode in a worker thread that is thrown away afterwards. The WebAssembly
+ * heap of libheif never shrinks, so decoding in the main thread would keep
+ * hundreds of megabytes resident until the next restart.
+ */
+const decodeInWorker = (buffer) =>
+  new Promise((resolve, reject) => {
+    const worker = new Worker(path.join(__dirname, 'heic-worker.js'), {
+      workerData: { buffer },
+    });
+    let settled = false;
+    const settle = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      // Wait for the worker to be gone before continuing, so its heap is
+      // released before sharp starts encoding.
+      worker.terminate().then(
+        () => fn(value),
+        () => fn(value)
+      );
+    };
+
+    worker.once('message', (message) => {
+      if (message && message.error) {
+        return settle(reject, heicError(HEIC_UNREADABLE, message.error));
+      }
+      settle(resolve, message);
+    });
+    worker.once('error', (error) => settle(reject, error));
+    worker.once('exit', (code) =>
+      settle(
+        reject,
+        heicError(HEIC_UNREADABLE, `HEIC decoder stopped with code ${code}.`)
+      )
+    );
+  });
+
+/**
+ * Give the raw pixels back right away instead of whenever the garbage
+ * collector gets to them: a 48 megapixel photo is a 195 MB buffer, and while it
+ * lingers the next conversion sees that much less free memory.
+ */
+const releasePixels = (data) => {
+  if (data && data.buffer && typeof data.buffer.transfer === 'function') {
+    data.buffer.transfer(0);
   }
-  return decodeHeic;
 };
 
 let activeConversions = 0;
@@ -144,7 +225,7 @@ const releaseSlot = () => {
  * Decode a HEIC buffer and re-encode it as JPEG. Throws when the buffer is not
  * HEIC, which is what makes this the authoritative check rather than the
  * extension. Conversions are capped because a 12 megapixel photo needs a 46 MB
- * raw buffer and the WebAssembly heap does not shrink again.
+ * raw buffer on top of the decoder's own heap.
  */
 const convertHeicToJpeg = async (buffer) => {
   const pixels = maxPixelsFromIspeBoxes(buffer);
@@ -160,13 +241,31 @@ const convertHeicToJpeg = async (buffer) => {
 
   await acquireSlot();
   try {
-    const { width, height, data } = await getDecoder()({ buffer });
+    // Checked inside the slot: only then is the memory of the previous
+    // conversion released and the measurement meaningful.
+    const convertibleMegapixels = getConvertibleMegapixels();
+    if (pixels > convertibleMegapixels * 1e6) {
+      console.warn(
+        `HEIC upload of ${Math.round(pixels / 1e6)} megapixels refused: only enough free memory for ${Math.floor(convertibleMegapixels)} megapixels. Raise the memory limit of the image server to accept larger HEIC photos.`
+      );
+      throw heicError(
+        HEIC_NOT_ENOUGH_MEMORY,
+        `Image is ${Math.round(pixels / 1e6)} megapixels, which is too large to convert on this server right now.`
+      );
+    }
 
-    return await sharp(Buffer.from(data.buffer, data.byteOffset, data.length), {
-      raw: { width, height, channels: 4 },
-    })
-      .jpeg({ quality: HEIC_JPEG_QUALITY })
-      .toBuffer();
+    const { width, height, data } = await decodeInWorker(buffer);
+
+    try {
+      return await sharp(
+        Buffer.from(data.buffer, data.byteOffset, data.length),
+        { raw: { width, height, channels: 4 } }
+      )
+        .jpeg({ quality: HEIC_JPEG_QUALITY })
+        .toBuffer();
+    } finally {
+      releasePixels(data);
+    }
   } finally {
     releaseSlot();
   }
@@ -178,7 +277,9 @@ module.exports = {
   HEIC_JPEG_QUALITY,
   HEIC_MAX_MEGAPIXELS,
   HEIC_TOO_MANY_PIXELS,
+  HEIC_NOT_ENOUGH_MEMORY,
   HEIC_UNREADABLE,
+  getConvertibleMegapixels,
   looksLikeHeicUpload,
   maxPixelsFromIspeBoxes,
   replaceExtension,

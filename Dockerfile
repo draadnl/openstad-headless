@@ -100,6 +100,8 @@ RUN if [ "${APP}" = "image-server" ]; then \
 # Development image
 FROM base AS development
 ENV NODE_ENV=${NODE_ENV:-development}
+# See the release stage for why the number of malloc arenas is limited
+ENV MALLOC_ARENA_MAX=2
 ARG OPENSTAD_VERSION
 ENV OPENSTAD_VERSION=$OPENSTAD_VERSION
 ENV NEXT_PUBLIC_OPENSTAD_VERSION=$OPENSTAD_VERSION
@@ -151,6 +153,12 @@ ARG OPENSTAD_VERSION
 ENV WORKSPACE=apps/${APP}
 ENV NODE_ENV=${NODE_ENV:-production}
 ENV OPENSTAD_VERSION=$OPENSTAD_VERSION
+# glibc creates up to 8 malloc arenas per CPU core and never returns their free
+# memory to the system. In a container with a memory limit that fragmentation
+# counts towards the limit: after a burst of image resizes the image server kept
+# 670 MB resident with the default and 330 MB with two arenas. Node's own heap is
+# not affected, only native allocations (Buffers, sharp/libvips, zlib, TLS).
+ENV MALLOC_ARENA_MAX=2
 
 WORKDIR /opt/openstad-headless
 

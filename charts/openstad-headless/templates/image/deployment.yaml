@@ -50,9 +50,9 @@ spec:
           - name: THROTTLE
             value: "{{ .Values.image.throttle.enabled | default true }}"
           - name: THROTTLE_CC_PROCESSORS
-            value: "{{ .Values.image.throttle.ccProcessors | default 4 }}"
+            value: "{{ .Values.image.throttle.ccProcessors | default 2 }}"
           - name: THROTTLE_CC_PREFETCHER
-            value: "{{ .Values.image.throttle.ccPrefetcher | default 20 }}"
+            value: "{{ .Values.image.throttle.ccPrefetcher | default 4 }}"
           - name: THROTTLE_CC_REQUESTS
             value: "{{ .Values.image.throttle.ccRequests | default 100 }}"
           - name: HQ_ORIGINAL_MAX_PIXELS
@@ -61,6 +61,10 @@ spec:
             value: "{{ .Values.image.disableWebpConversion | default false }}"
           - name: MAX_FILE_UPLOAD_SIZE_MB
             value: "{{ .Values.image.maxFileUploadSizeMB | default 25 }}"
+          - name: IMAGE_MAX_INPUT_MEGAPIXELS
+            value: "{{ .Values.image.maxInputMegapixels | default 120 }}"
+          - name: MALLOC_ARENA_MAX
+            value: "{{ .Values.image.mallocArenaMax | default 2 }}"
           - name: IMAGE_VERIFICATION_TOKEN
             valueFrom:
               secretKeyRef:

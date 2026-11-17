@@ -61,8 +61,17 @@ module.exports = {
                 'CRON project-ended-anonymize-users: anonymize user',
                 user.email
               );
-              // anonymize user
-              user.doAnonymize();
+              // anonymize user; one at a time, because each call loads the
+              // user's resources, comments and votes
+              try {
+                await user.doAnonymize();
+              } catch (err) {
+                console.log(
+                  'CRON project-ended-anonymize-users: failed for user',
+                  user.id,
+                  err?.message
+                );
+              }
             }
           }
         }

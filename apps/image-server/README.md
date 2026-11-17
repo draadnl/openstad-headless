@@ -40,6 +40,27 @@ CACHE_OPTIMIZED_TTS=
 
 For throttle see options in [node-steam](https://github.com/asilvas/node-image-steam#throttle-options).
 
+#### Memory
+
+Image processing happens outside the Node.js heap, so the usual V8 limits do not protect the server.
+These settings keep it inside the memory limit of its container:
+
+| Variable                          | Default | What it does                                                                                                                                                                      |
+| --------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MALLOC_ARENA_MAX`                | `2`     | Set in the Dockerfile and the Helm chart. Stops glibc from holding on to memory freed after a resize. Without it the server kept 670 MB after a burst of resizes, with it 330 MB. |
+| `THROTTLE_CC_PROCESSORS`          | `2`     | Images decoded and resized at the same time. One large photo takes 100-300 MB while it is being resized.                                                                          |
+| `THROTTLE_CC_PREFETCHER`          | `4`     | Image requests handled at the same time. Each one holds the complete original in memory. Requests above the limit wait.                                                           |
+| `IMAGE_MAX_INPUT_MEGAPIXELS`      | `120`   | Images with more pixels are not resized (HTTP 400). A 0.8 MB PNG can decode to 250 megapixels and needs 900 MB.                                                                   |
+| `HEIC_MAX_MEGAPIXELS`             | `50`    | Largest HEIC photo that is converted to JPEG on upload.                                                                                                                           |
+| `HEIC_MAX_CONCURRENT_CONVERSIONS` | `1`     | HEIC conversions running at the same time. Converting takes about 13 MB per megapixel: 250 MB for 12 megapixels, 400 MB for 24 and 650 MB for 48.                                 |
+| `MAX_FILE_UPLOAD_SIZE_MB`         | `25`    | Largest accepted upload.                                                                                                                                                          |
+
+A HEIC upload is refused with a readable error (HTTP 415) when converting it would not fit in the memory
+that is left under the container limit. With the 1Gi limit of the Helm chart every photo up to
+`HEIC_MAX_MEGAPIXELS` fits; with 500 MB the limit is around 20 megapixels.
+
+See `MEMORY_WINS.md` in the root of the repository for the measurements behind these defaults.
+
 The app url is used to return a full url after upload.
 
 Images directory defaults to images, if doesn't get created, create it manually.

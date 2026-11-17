@@ -1,16 +1,32 @@
-const { NodeSDK } = require('@opentelemetry/sdk-node');
-const {
-  getNodeAutoInstrumentations,
-} = require('@opentelemetry/auto-instrumentations-node');
-const {
-  OTLPTraceExporter,
-} = require('@opentelemetry/exporter-trace-otlp-grpc');
-const { resourceFromAttributes } = require('@opentelemetry/resources');
 // Use standard OTel resource attribute names (semantic-conventions exports can vary by version)
 const SERVICE_NAME = 'service.name';
 const SERVICE_VERSION = 'service.version';
 const DEPLOYMENT_ENVIRONMENT = 'deployment.environment';
-const { SimpleSpanProcessor } = require('@opentelemetry/sdk-trace-base');
+
+/**
+ * The OpenTelemetry SDK and its auto-instrumentations are only loaded when
+ * telemetry is enabled. Requiring them costs about 45 MB of resident memory
+ * per server, and telemetry is off by default.
+ */
+function loadOpenTelemetry() {
+  const { NodeSDK } = require('@opentelemetry/sdk-node');
+  const {
+    getNodeAutoInstrumentations,
+  } = require('@opentelemetry/auto-instrumentations-node');
+  const {
+    OTLPTraceExporter,
+  } = require('@opentelemetry/exporter-trace-otlp-grpc');
+  const { resourceFromAttributes } = require('@opentelemetry/resources');
+  const { SimpleSpanProcessor } = require('@opentelemetry/sdk-trace-base');
+
+  return {
+    NodeSDK,
+    getNodeAutoInstrumentations,
+    OTLPTraceExporter,
+    resourceFromAttributes,
+    SimpleSpanProcessor,
+  };
+}
 
 const defaultConfig = {
   enabled: process.env.OTEL_ENABLED === 'true',
@@ -38,6 +54,14 @@ function createTelemetry(config = {}) {
     }
 
     try {
+      const {
+        NodeSDK,
+        getNodeAutoInstrumentations,
+        OTLPTraceExporter,
+        resourceFromAttributes,
+        SimpleSpanProcessor,
+      } = loadOpenTelemetry();
+
       const resource = resourceFromAttributes({
         [SERVICE_NAME]: merged.serviceName,
         [SERVICE_VERSION]: merged.serviceVersion,
