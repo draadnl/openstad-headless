@@ -352,7 +352,9 @@ router.post('/:widgetId([a-zA-Z0-9]+)/report-block', async (req, res) => {
     return res.status(400).json({ error: 'Missing domain' });
   }
 
-  const cooldownKey = `${widgetId}:${domain}`;
+  // Truncated like the stored value below. Without it this map, which anyone
+  // can write to, could be filled with request bodies of up to 10 MB each.
+  const cooldownKey = `${widgetId}:${domain.substring(0, 255)}`;
   const lastReport = reportBlockCooldowns.get(cooldownKey);
   if (lastReport && Date.now() - lastReport < REPORT_BLOCK_COOLDOWN_MS) {
     return res.status(200).json({ ok: true });
