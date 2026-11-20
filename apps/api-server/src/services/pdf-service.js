@@ -160,7 +160,53 @@ function buildPdfHtml(
 </html>`;
 }
 
-async function generatePdf(htmlString) {
+const DEFAULT_PDF_TIMEOUT_MS = 15000;
+const DEFAULT_PDF_MAX_BYTES = 20 * 1024 * 1024;
+
+// True when both settings for the PDF service are filled in.
+function isPdfConfigured() {
+  return !!process.env.PDF_API_ENDPOINT && !!process.env.PDF_API_KEY;
+}
+
+// An error that only carries a fixed code and the upstream status number.
+function pdfError(code, status) {
+  const err = new Error(code);
+  err.code = code;
+  if (status) err.status = status;
+  return err;
+}
+
+// Reads the response in pieces and stops as soon as it gets too big.
+async function readLimited(response, maxBytes) {
+  const declared = parseInt(response.headers.get('content-length') || '0', 10);
+  if (declared > maxBytes) throw pdfError('PDF_TOO_LARGE');
+
+  if (!response.body || typeof response.body.getReader !== 'function') {
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.length > maxBytes) throw pdfError('PDF_TOO_LARGE');
+    return buffer;
+  }
+
+  const reader = response.body.getReader();
+  const chunks = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => {});
+      throw pdfError('PDF_TOO_LARGE');
+    }
+    chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks);
+}
+
+async function generatePdf(
+  htmlString,
+  { timeoutMs = DEFAULT_PDF_TIMEOUT_MS, maxBytes = DEFAULT_PDF_MAX_BYTES } = {}
+) {
   const endpoint = process.env.PDF_API_ENDPOINT;
   const apiKey = process.env.PDF_API_KEY;
 
@@ -172,22 +218,36 @@ async function generatePdf(htmlString) {
   );
   formData.append('save', 'false');
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: formData,
-    signal: AbortSignal.timeout(15000),
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`PDF API returned ${response.status}: ${body}`);
+  let response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: formData,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (err) {
+    if (err && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
+      throw pdfError('PDF_TIMEOUT');
+    }
+    throw pdfError('PDF_UPSTREAM_ERROR');
   }
 
-  const arrayBuffer = await response.arrayBuffer();
-  return Buffer.from(arrayBuffer);
+  if (!response.ok) {
+    throw pdfError('PDF_UPSTREAM_ERROR', response.status);
+  }
+
+  try {
+    return await readLimited(response, maxBytes);
+  } catch (err) {
+    if (err && err.code === 'PDF_TOO_LARGE') throw err;
+    if (err && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
+      throw pdfError('PDF_TIMEOUT');
+    }
+    throw pdfError('PDF_UPSTREAM_ERROR');
+  }
 }
 
 function urlOrigin(url) {
@@ -245,6 +305,7 @@ async function fetchImageAsDataUrl(url) {
 module.exports = {
   buildPdfHtml,
   generatePdf,
+  isPdfConfigured,
   fetchImageAsDataUrl,
   escapeHtml,
   escapeAttr,

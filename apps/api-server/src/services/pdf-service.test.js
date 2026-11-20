@@ -2,7 +2,11 @@ import { createRequire } from 'node:module';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const { fetchImageAsDataUrl } = require('./pdf-service');
+const {
+  fetchImageAsDataUrl,
+  generatePdf,
+  isPdfConfigured,
+} = require('./pdf-service');
 
 const IMAGE_APP_URL = 'https://img.example.org';
 const IMAGE_APP_URL_INTERNAL = 'http://openstad-image-server:31450';
@@ -87,5 +91,105 @@ describe('fetchImageAsDataUrl', () => {
 
     expect(await fetchImageAsDataUrl(dataUrl)).toBe(dataUrl);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('generatePdf', () => {
+  let originalEnv;
+
+  beforeEach(() => {
+    originalEnv = {
+      PDF_API_ENDPOINT: process.env.PDF_API_ENDPOINT,
+      PDF_API_KEY: process.env.PDF_API_KEY,
+    };
+    process.env.PDF_API_ENDPOINT = 'https://pdf.example/api';
+    process.env.PDF_API_KEY = 'secret-key-sentinel';
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+
+  it('isPdfConfigured needs both settings', () => {
+    expect(isPdfConfigured()).toBe(true);
+    delete process.env.PDF_API_KEY;
+    expect(isPdfConfigured()).toBe(false);
+  });
+
+  it('returns the pdf bytes', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(Buffer.from('abc')))
+    );
+    const out = await generatePdf('<p>x</p>');
+    expect(out.toString()).toBe('abc');
+  });
+
+  it('refuses a response whose content-length is over maxBytes', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(Buffer.from('abc'), {
+          headers: { 'content-length': '100' },
+        })
+      )
+    );
+    await expect(
+      generatePdf('<p>x</p>', { maxBytes: 10 })
+    ).rejects.toMatchObject({
+      code: 'PDF_TOO_LARGE',
+    });
+  });
+
+  it('stops a stream that grows over maxBytes without a content-length', async () => {
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new Uint8Array(8));
+        controller.enqueue(new Uint8Array(8));
+        controller.close();
+      },
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(stream)));
+    await expect(
+      generatePdf('<p>x</p>', { maxBytes: 10 })
+    ).rejects.toMatchObject({
+      code: 'PDF_TOO_LARGE',
+    });
+  });
+
+  it('accepts exactly maxBytes', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(Buffer.alloc(10)))
+    );
+    const out = await generatePdf('<p>x</p>', { maxBytes: 10 });
+    expect(out.length).toBe(10);
+  });
+
+  it('never puts the upstream body or the key in the error', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response('upstream says answer-sentinel and secret-key-sentinel', {
+          status: 500,
+        })
+      )
+    );
+    const err = await generatePdf('<p>x</p>').catch((e) => e);
+    expect(err.code).toBe('PDF_UPSTREAM_ERROR');
+    expect(err.status).toBe(500);
+    expect(JSON.stringify([err.message, err.stack])).not.toMatch(/sentinel/);
+  });
+
+  it('maps a timeout to PDF_TIMEOUT', async () => {
+    const timeout = Object.assign(new Error('t'), { name: 'TimeoutError' });
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(timeout));
+    await expect(generatePdf('<p>x</p>')).rejects.toMatchObject({
+      code: 'PDF_TIMEOUT',
+    });
   });
 });
