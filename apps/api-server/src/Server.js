@@ -170,6 +170,11 @@ module.exports = {
 
     this.app.use(require('./middleware/security-headers'));
 
+    // Smaller limit for the survey PDF route; must come before the global parser.
+    require('./middleware/enquete-pdf-body-parser').mountEnquetePdfBodyParser(
+      this.app
+    );
+
     this.app.use(bodyParser.json({ limit: '10mb' }));
     this.app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
     this.app.use(

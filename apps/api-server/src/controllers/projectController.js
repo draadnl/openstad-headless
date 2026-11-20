@@ -32,6 +32,7 @@ const getWidgetSettings = require('../routes/widget/widget-settings');
 const dup = require('../services/projectDuplication');
 const projectUsers = require('../services/projectUsers');
 const authClientSync = require('../services/authClientSync');
+const { isPdfConfigured } = require('../services/pdf-service');
 const projectCertificates = require('../services/projectCertificates');
 
 const widgetDefinitions = getWidgetSettings();
@@ -1237,8 +1238,7 @@ async function retryCertificate(req, res, next) {
 // ----------------------------------------------------------------------------
 
 function getPdfStatus(req, res) {
-  const available = !!process.env.PDF_API_ENDPOINT && !!process.env.PDF_API_KEY;
-  res.json({ available });
+  res.json({ available: isPdfConfigured() });
 }
 
 async function getBranding(req, res) {
