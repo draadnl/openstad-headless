@@ -321,6 +321,9 @@ function setScope(req, res, next) {
     req.scope.push('includeInstallationUrls');
   }
 
+  req.includeCounts =
+    req.query.includeCounts === '1' || req.query.includeCounts === 'true';
+
   return next();
 }
 
@@ -358,11 +361,26 @@ async function listProjects(req, res, next) {
       ? req.scope.filter((scopeName) => scopeName !== 'excludeConfig')
       : req.scope;
 
-    let result = await db.Project.scope(listScope).findAndCountAll({
+    const findOptions = {
       offset: req.dbQuery.offset,
       limit: req.dbQuery.limit,
       where,
-    });
+    };
+
+    if (req.includeCounts && !req.scope.includes('getBasicInformation')) {
+      findOptions.attributes = {
+        include: [
+          [
+            Sequelize.literal(
+              '(SELECT COUNT(*) FROM widgets AS w WHERE w.projectId = project.id AND w.deletedAt IS NULL)'
+            ),
+            'widgetCount',
+          ],
+        ],
+      };
+    }
+
+    let result = await db.Project.scope(listScope).findAndCountAll(findOptions);
     if (req.user?.role === 'editor') {
       result.rows = result.rows.filter((project) => project.id !== 1);
     }

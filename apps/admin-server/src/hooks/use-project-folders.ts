@@ -1,5 +1,10 @@
 import useSWR, { type SWRConfiguration, useSWRConfig } from 'swr';
 
+import {
+  PROJECT_LIST_KEY,
+  PROJECT_LIST_WITH_COUNTS_KEY,
+} from './use-project-list';
+
 export type ProjectFolder = {
   id: number;
   name: string;
@@ -8,13 +13,18 @@ export type ProjectFolder = {
 };
 
 const foldersUrl = '/api/openstad/api/project-folder';
-const projectListUrl = '/api/openstad/api/project?includeConfig=1';
 
 export default function useProjectFolders(
   options?: SWRConfiguration<ProjectFolder[]>
 ) {
   const foldersSwr = useSWR<ProjectFolder[]>(foldersUrl, options);
   const { mutate } = useSWRConfig();
+
+  const refreshProjectLists = () =>
+    Promise.all([
+      mutate(PROJECT_LIST_KEY),
+      mutate(PROJECT_LIST_WITH_COUNTS_KEY),
+    ]);
 
   async function createFolder(name: string, projectIds: number[]) {
     const res = await fetch(foldersUrl, {
@@ -30,7 +40,7 @@ export default function useProjectFolders(
     }
 
     const folder = await res.json();
-    await Promise.all([foldersSwr.mutate(), mutate(projectListUrl)]);
+    await Promise.all([foldersSwr.mutate(), refreshProjectLists()]);
     return folder;
   }
 
@@ -48,7 +58,7 @@ export default function useProjectFolders(
     }
 
     const folder = await res.json();
-    await Promise.all([foldersSwr.mutate(), mutate(projectListUrl)]);
+    await Promise.all([foldersSwr.mutate(), refreshProjectLists()]);
     return folder;
   }
 
@@ -59,7 +69,7 @@ export default function useProjectFolders(
       throw new Error('Kon de map niet verwijderen');
     }
 
-    await Promise.all([foldersSwr.mutate(), mutate(projectListUrl)]);
+    await Promise.all([foldersSwr.mutate(), refreshProjectLists()]);
   }
 
   return { ...foldersSwr, createFolder, updateFolder, deleteFolder };

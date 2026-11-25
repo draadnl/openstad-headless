@@ -21,6 +21,12 @@ import {
   projectCreateHref,
 } from '@/lib/project-folders';
 import {
+  countIssuesByProject,
+  formatIsoDate,
+  participationLabels,
+  withOverviewCounts,
+} from '@/lib/project-overview-columns';
+import {
   Check,
   ChevronRight,
   Folder,
@@ -41,26 +47,26 @@ type SearchableField = {
   getValue: (project: any) => string;
 };
 
+const OVERVIEW_GRID_COLUMNS =
+  'grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.75fr)_minmax(0,0.75fr)_minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]';
+
 const SEARCHABLE_FIELDS: SearchableField[] = [
   { key: 'name', label: 'Projectnaam', getValue: (p) => p?.name || '' },
   { key: 'url', label: 'URL', getValue: (p) => p?.url || '' },
   {
-    key: 'votes',
-    label: 'Stemmen',
-    getValue: (p) => (p?.config?.votes?.isActive === true ? 'Aan' : 'Uit'),
+    key: 'createdAt',
+    label: 'Aanmaakdatum',
+    getValue: (p) => formatIsoDate(p?.createdAt),
   },
   {
-    key: 'comments',
-    label: 'Reacties',
-    getValue: (p) => (p?.config?.comments?.canComment === true ? 'Aan' : 'Uit'),
+    key: 'participation',
+    label: 'Deelname',
+    getValue: (p) => participationLabels(p).join(', '),
   },
   {
     key: 'endDate',
-    label: 'Eind datum',
-    getValue: (p) => {
-      const date = p?.config?.project?.endDate;
-      return date ? new Date(date).toLocaleDateString('nl-NL') : '';
-    },
+    label: 'Einddatum',
+    getValue: (p) => formatIsoDate(p?.config?.project?.endDate),
   },
 ];
 
@@ -102,7 +108,15 @@ const applySearchFilter = (projects: any[], term: string, fieldKey: string) => {
 };
 
 export default function Projects() {
-  const { data } = projectListSwr();
+  const { data: listData } = projectListSwr({ includeCounts: true });
+  const { data: issuesData } = projectListSwr({ projectsWithIssues: true });
+  const data = useMemo(
+    () =>
+      listData && issuesData
+        ? withOverviewCounts(listData, countIssuesByProject(issuesData))
+        : listData,
+    [listData, issuesData]
+  );
   const router = useRouter();
 
   const [filterSearchType, setFilterSearchType] = useState('');
@@ -307,7 +321,8 @@ export default function Projects() {
           )}
 
           <div className="p-6 bg-white rounded-md clear-right">
-            <div className="grid grid-cols-2 lg:grid-cols-8 items-center py-2 px-2 border-b border-border">
+            <div
+              className={`grid ${OVERVIEW_GRID_COLUMNS} items-center py-2 px-2 border-b border-border`}>
               <ListHeading className="hidden lg:flex">
                 <button
                   className="filter-button"
@@ -321,7 +336,16 @@ export default function Projects() {
                 <button
                   className="filter-button"
                   onClick={(e) =>
-                    setSortedData(sortTable('issues', e, displayData))
+                    setSortedData(sortTable('createdAt', e, displayData))
+                  }>
+                  Aanmaakdatum
+                </button>
+              </ListHeading>
+              <ListHeading className="hidden lg:flex">
+                <button
+                  className="filter-button"
+                  onClick={(e) =>
+                    setSortedData(sortTable('issueCount', e, displayData))
                   }>
                   Problemen
                 </button>
@@ -330,29 +354,12 @@ export default function Projects() {
                 <button
                   className="filter-button"
                   onClick={(e) =>
-                    setSortedData(sortTable('votesIsActive', e, displayData))
+                    setSortedData(sortTable('widgetCount', e, displayData))
                   }>
-                  Stemmen
+                  Widgets
                 </button>
               </ListHeading>
-              <ListHeading className="hidden lg:flex">
-                <button
-                  className="filter-button"
-                  onClick={(e) =>
-                    setSortedData(sortTable('commentsIsActive', e, displayData))
-                  }>
-                  Reacties
-                </button>
-              </ListHeading>
-              <ListHeading className="hidden lg:flex">
-                <button
-                  className="filter-button"
-                  onClick={(e) =>
-                    setSortedData(sortTable('resources', e, displayData))
-                  }>
-                  Inzendingen
-                </button>
-              </ListHeading>
+              <ListHeading className="hidden lg:flex">Deelname</ListHeading>
               <ListHeading className="hidden lg:flex">
                 <button
                   className="filter-button"
@@ -376,7 +383,7 @@ export default function Projects() {
               {grouped.folders.map(({ folder, count }) => (
                 <li
                   key={`folder-${folder.id}`}
-                  className="grid grid-cols-2 lg:grid-cols-8 items-center py-3 px-2 h-16 bg-gray-100 hover:bg-gray-200 border-b border-border gap-2">
+                  className={`grid ${OVERVIEW_GRID_COLUMNS} items-center py-3 px-2 h-16 bg-gray-100 hover:bg-gray-200 border-b border-border gap-2`}>
                   <Link
                     href={`/projects?folder=${folder.id}`}
                     className="col-span-2 lg:col-span-7 flex items-center gap-3 h-full">
@@ -396,58 +403,84 @@ export default function Projects() {
                   </Paragraph>
                 </li>
               ))}
-              {displayData?.map((project: any) => (
-                <li
-                  className="grid grid-cols-2 lg:grid-cols-8 items-center py-3 px-2 h-16 hover:bg-secondary-background hover:cursor-pointer border-b border-border gap-2"
-                  key={project.id}
-                  onClick={() =>
-                    router.push(`/projects/${project.id}/widgets`)
-                  }>
-                  <Paragraph className="truncate">
-                    {fieldsByKey.name.getValue(project)}
-                  </Paragraph>
-                  <Paragraph className="hidden lg:flex truncate">
-                    Geen
-                  </Paragraph>
-                  <Paragraph className="hidden lg:flex truncate">
-                    {fieldsByKey.votes.getValue(project)}
-                  </Paragraph>
-                  <Paragraph className="hidden lg:flex truncate">
-                    {fieldsByKey.comments.getValue(project)}
-                  </Paragraph>
-                  <Paragraph className="hidden lg:flex truncate">
-                    Open
-                  </Paragraph>
-                  <Paragraph className="hidden lg:flex truncate -mr-16">
-                    {fieldsByKey.endDate.getValue(project)}
-                  </Paragraph>
-                  <Paragraph className="hidden lg:flex truncate">
-                    {fieldsByKey.url.getValue(project)}
-                  </Paragraph>
-                  <Paragraph className="flex items-center justify-end gap-2">
-                    {HasAccess(sessionData) && (
-                      <button
-                        type="button"
-                        title="Bewaar als template"
-                        aria-label={`Bewaar project ${
-                          project.name || ''
-                        } als template`}
-                        className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-gray-100"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setTemplateName(project.name || '');
-                          setTemplateSource(project);
-                        }}>
-                        <LayoutTemplate strokeWidth={1.5} className="w-5 h-5" />
-                      </button>
-                    )}
-                    <ChevronRight
-                      strokeWidth={1.5}
-                      className="w-5 h-5 my-auto"
-                    />
-                  </Paragraph>
-                </li>
-              ))}
+              {displayData?.map((project: any) => {
+                const participation =
+                  fieldsByKey.participation.getValue(project);
+                const endDate = fieldsByKey.endDate.getValue(project);
+                const projectUrl = fieldsByKey.url.getValue(project);
+                return (
+                  <li
+                    className={`grid ${OVERVIEW_GRID_COLUMNS} items-center py-3 px-2 h-16 hover:bg-secondary-background hover:cursor-pointer border-b border-border gap-2`}
+                    key={project.id}
+                    onClick={() =>
+                      router.push(`/projects/${project.id}/widgets`)
+                    }>
+                    <Paragraph className="truncate">
+                      {fieldsByKey.name.getValue(project)}
+                    </Paragraph>
+                    <Paragraph className="hidden lg:flex truncate">
+                      {fieldsByKey.createdAt.getValue(project)}
+                    </Paragraph>
+                    <Paragraph className="hidden lg:flex truncate">
+                      {project.issueCount ===
+                      undefined ? null : project.issueCount > 0 ? (
+                        <Link
+                          href="/issues"
+                          className="underline"
+                          aria-label={`${project.issueCount} problemen bekijken`}
+                          onClick={(e) => e.stopPropagation()}>
+                          {project.issueCount}
+                        </Link>
+                      ) : (
+                        0
+                      )}
+                    </Paragraph>
+                    <Paragraph className="hidden lg:flex truncate">
+                      {Number(project.widgetCount ?? 0)}
+                    </Paragraph>
+                    <Paragraph
+                      className="hidden lg:flex min-w-0"
+                      title={participation || undefined}>
+                      <span className="block truncate">{participation}</span>
+                    </Paragraph>
+                    <Paragraph
+                      className="hidden lg:flex min-w-0"
+                      title={endDate || undefined}>
+                      <span className="block truncate">{endDate}</span>
+                    </Paragraph>
+                    <Paragraph
+                      className="hidden lg:flex min-w-0"
+                      title={projectUrl || undefined}>
+                      <span className="block truncate">{projectUrl}</span>
+                    </Paragraph>
+                    <Paragraph className="flex items-center justify-end gap-2">
+                      {HasAccess(sessionData) && (
+                        <button
+                          type="button"
+                          title="Bewaar als template"
+                          aria-label={`Bewaar project ${
+                            project.name || ''
+                          } als template`}
+                          className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-gray-100"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setTemplateName(project.name || '');
+                            setTemplateSource(project);
+                          }}>
+                          <LayoutTemplate
+                            strokeWidth={1.5}
+                            className="w-5 h-5"
+                          />
+                        </button>
+                      )}
+                      <ChevronRight
+                        strokeWidth={1.5}
+                        className="w-5 h-5 my-auto"
+                      />
+                    </Paragraph>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         </div>
