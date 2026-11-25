@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { groupProjectsByFolder, sortNewestFirst } from './project-folders';
+import {
+  groupProjectsByFolder,
+  parseFolderQuery,
+  sidenavFolderItems,
+  sortNewestFirst,
+} from './project-folders';
 
 const folders = [
   { id: 1, name: 'Templates' },
@@ -79,5 +84,67 @@ describe('groupProjectsByFolder', () => {
   it('handles missing input', () => {
     const result = groupProjectsByFolder([], [], {});
     expect(result).toEqual({ folders: [], projects: [] });
+  });
+});
+
+describe('parseFolderQuery', () => {
+  it('parses a number string', () => {
+    expect(parseFolderQuery('12')).toBe(12);
+  });
+  it('uses the first value of an array', () => {
+    expect(parseFolderQuery(['7', '9'])).toBe(7);
+  });
+  it('rejects values that are not purely digits', () => {
+    expect(parseFolderQuery('12abc')).toBeNull();
+  });
+  it('returns null when undefined', () => {
+    expect(parseFolderQuery(undefined)).toBeNull();
+  });
+});
+
+describe('sidenavFolderItems', () => {
+  it('lists "Alle projecten" first, then folders by name with hrefs', () => {
+    const items = sidenavFolderItems(folders, {
+      pathname: '/projects',
+      folderQuery: undefined,
+    });
+    expect(items.map((i) => i.label)).toEqual([
+      'Alle projecten',
+      'Beheer',
+      'Leeg',
+      'Templates',
+    ]);
+    expect(items.map((i) => i.href)).toEqual([
+      '/projects',
+      '/projects?folder=2',
+      '/projects?folder=3',
+      '/projects?folder=1',
+    ]);
+  });
+
+  it('marks "Alle projecten" active without a folder query', () => {
+    const items = sidenavFolderItems(folders, {
+      pathname: '/projects',
+      folderQuery: undefined,
+    });
+    expect(items.filter((i) => i.active).map((i) => i.key)).toEqual(['all']);
+  });
+
+  it('marks the folder active when the query matches', () => {
+    const items = sidenavFolderItems(folders, {
+      pathname: '/projects',
+      folderQuery: '2',
+    });
+    expect(items.filter((i) => i.active).map((i) => i.key)).toEqual([
+      'folder-2',
+    ]);
+  });
+
+  it('marks nothing active on another pathname', () => {
+    const items = sidenavFolderItems(folders, {
+      pathname: '/projects/5/widgets',
+      folderQuery: undefined,
+    });
+    expect(items.some((i) => i.active)).toBe(false);
   });
 });

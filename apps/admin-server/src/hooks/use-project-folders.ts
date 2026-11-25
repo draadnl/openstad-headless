@@ -1,4 +1,4 @@
-import useSWR, { useSWRConfig } from 'swr';
+import useSWR, { type SWRConfiguration, useSWRConfig } from 'swr';
 
 export type ProjectFolder = {
   id: number;
@@ -10,8 +10,10 @@ export type ProjectFolder = {
 const foldersUrl = '/api/openstad/api/project-folder';
 const projectListUrl = '/api/openstad/api/project?includeConfig=1';
 
-export default function useProjectFolders() {
-  const foldersSwr = useSWR<ProjectFolder[]>(foldersUrl);
+export default function useProjectFolders(
+  options?: SWRConfiguration<ProjectFolder[]>
+) {
+  const foldersSwr = useSWR<ProjectFolder[]>(foldersUrl, options);
   const { mutate } = useSWRConfig();
 
   async function createFolder(name: string, projectIds: number[]) {

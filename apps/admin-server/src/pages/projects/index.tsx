@@ -15,7 +15,7 @@ import { ListHeading, Paragraph } from '@/components/ui/typography';
 import useProjectFolders from '@/hooks/use-project-folders';
 import useTemplates from '@/hooks/use-template';
 import { HasAccess } from '@/lib/hasAccess';
-import { groupProjectsByFolder } from '@/lib/project-folders';
+import { groupProjectsByFolder, parseFolderQuery } from '@/lib/project-folders';
 import {
   Check,
   ChevronRight,
@@ -114,6 +114,7 @@ export default function Projects() {
 
   const sessionData = useContext(SessionContext);
   const isAdmin = !!HasAccess(sessionData);
+  const isSuperuser = sessionData?.role === 'superuser';
 
   const {
     data: folders,
@@ -124,11 +125,7 @@ export default function Projects() {
   const [folderDialogOpen, setFolderDialogOpen] = useState(false);
   const [editFolderOpen, setEditFolderOpen] = useState(false);
   const [deleteFolderOpen, setDeleteFolderOpen] = useState(false);
-  const folderParam = Array.isArray(router.query.folder)
-    ? router.query.folder[0]
-    : router.query.folder;
-  const folderId =
-    folderParam && /^\d+$/.test(folderParam) ? Number(folderParam) : null;
+  const folderId = parseFolderQuery(router.query.folder);
   const openFolder = folderId
     ? (folders || []).find((f) => f.id === folderId)
     : undefined;
@@ -138,9 +135,9 @@ export default function Projects() {
       groupProjectsByFolder(filteredData || [], folders || [], {
         folderId,
         hasSearch: searchTerm.length > 0,
-        isAdmin,
+        isAdmin: isSuperuser,
       }),
-    [filteredData, folders, folderId, searchTerm, isAdmin]
+    [filteredData, folders, folderId, searchTerm, isSuperuser]
   );
 
   // Separate state for column sorting (sortTable mutates imperatively)

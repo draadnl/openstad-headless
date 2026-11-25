@@ -3,6 +3,7 @@ const { Op } = require('sequelize');
 const db = require('../../db');
 const auth = require('../../middleware/sequelize-authorization-middleware');
 const sanitize = require('../../util/sanitize');
+const { findOwnProjectIds } = require('../../util/own-project-ids');
 
 const express = require('express');
 const router = express.Router({ mergeParams: true });
@@ -41,15 +42,36 @@ router
   .route('/')
 
   .get(auth.can('ProjectFolder', 'list'))
-  .get(function (req, res, next) {
-    db.ProjectFolder.findAll()
-      .then((folders) => {
-        const sorted = [...folders].sort((a, b) =>
-          String(a.name).localeCompare(String(b.name))
-        );
-        res.json(sorted.map((folder) => folder.toJSON(req.user)));
-      })
-      .catch(next);
+  .get(async function (req, res, next) {
+    try {
+      let folders = await db.ProjectFolder.findAll();
+
+      const ownIds = await findOwnProjectIds(req.user);
+      if (ownIds !== null) {
+        const ids =
+          req.user?.role === 'editor'
+            ? ownIds.filter((id) => id !== 1)
+            : ownIds;
+
+        if (!ids.length) {
+          folders = [];
+        } else {
+          const projects = await db.Project.findAll({
+            where: { id: { [Op.in]: ids }, folderId: { [Op.ne]: null } },
+            attributes: ['folderId'],
+          });
+          const visible = new Set(projects.map((p) => p.folderId));
+          folders = folders.filter((folder) => visible.has(folder.id));
+        }
+      }
+
+      const sorted = [...folders].sort((a, b) =>
+        String(a.name).localeCompare(String(b.name))
+      );
+      res.json(sorted.map((folder) => folder.toJSON(req.user)));
+    } catch (err) {
+      next(err);
+    }
   })
 
   .post(auth.can('ProjectFolder', 'create'))

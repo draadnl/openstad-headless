@@ -61,3 +61,45 @@ export function groupProjectsByFolder<
 
   return { folders: rows, projects: loose };
 }
+
+export function parseFolderQuery(
+  value: string | string[] | undefined
+): number | null {
+  const first = Array.isArray(value) ? value[0] : value;
+  return first && /^\d+$/.test(first) ? Number(first) : null;
+}
+
+export type SidenavFolderItem = {
+  key: string;
+  label: string;
+  href: string;
+  active: boolean;
+};
+
+export function sidenavFolderItems<F extends FolderLike>(
+  folders: F[] | undefined,
+  {
+    pathname,
+    folderQuery,
+  }: { pathname: string; folderQuery?: string | string[] }
+): SidenavFolderItem[] {
+  const onOverview = pathname === '/projects';
+  const activeId = parseFolderQuery(folderQuery);
+
+  return [
+    {
+      key: 'all',
+      label: 'Alle projecten',
+      href: '/projects',
+      active: onOverview && activeId === null,
+    },
+    ...[...(folders || [])]
+      .sort((a, b) => String(a.name).localeCompare(String(b.name)))
+      .map((folder) => ({
+        key: `folder-${folder.id}`,
+        label: folder.name,
+        href: `/projects?folder=${folder.id}`,
+        active: onOverview && activeId === folder.id,
+      })),
+  ];
+}

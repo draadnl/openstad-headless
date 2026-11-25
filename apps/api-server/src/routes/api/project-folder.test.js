@@ -23,6 +23,8 @@ const originals = {
   create: db.ProjectFolder.create,
   findAll: db.ProjectFolder.findAll,
   findByPk: db.ProjectFolder.findByPk,
+  userFindAll: db.User.findAll,
+  projectFindAll: db.Project.findAll,
 };
 
 function createApp(user) {
@@ -42,6 +44,7 @@ function createApp(user) {
 
 const admin = { id: 1, role: 'admin' };
 const editor = { id: 2, role: 'editor' };
+const superuser = { id: 3, role: 'superuser' };
 
 let folderInstance;
 
@@ -57,6 +60,8 @@ describe('project-folder routes', () => {
       db.ProjectFolder.build({ id: 2, name: 'Zebra' }),
       db.ProjectFolder.build({ id: 1, name: 'Appel' }),
     ]);
+    db.User.findAll = vi.fn(async () => [{ projectId: 10 }]);
+    db.Project.findAll = vi.fn(async () => [{ folderId: 2 }]);
     folderInstance = db.ProjectFolder.build({ id: 5, name: 'Oud' });
     folderInstance.update = vi.fn(async function (values) {
       Object.assign(this, values);
@@ -75,6 +80,8 @@ describe('project-folder routes', () => {
     db.Project.update = originals.update;
     db.ProjectFolder.create = originals.create;
     db.ProjectFolder.findAll = originals.findAll;
+    db.User.findAll = originals.userFindAll;
+    db.Project.findAll = originals.projectFindAll;
   });
 
   it('creates a folder and moves the projects in one transaction', async () => {
@@ -185,11 +192,85 @@ describe('project-folder routes', () => {
     expect(db.ProjectFolder.create).not.toHaveBeenCalled();
   });
 
-  it('lists folders sorted by name for an editor', async () => {
-    const res = await request(createApp(editor)).get('/project-folder');
+  describe('GET /project-folder visibility', () => {
+    const list = (user) => request(createApp(user)).get('/project-folder');
 
-    expect(res.status).toBe(200);
-    expect(res.body.map((f) => f.name)).toEqual(['Appel', 'Zebra']);
+    it('shows a superuser every folder, including empty ones', async () => {
+      const res = await list(superuser);
+
+      expect(res.status).toBe(200);
+      expect(res.body.map((f) => f.name)).toEqual(['Appel', 'Zebra']);
+      expect(db.User.findAll).not.toHaveBeenCalled();
+      expect(db.Project.findAll).not.toHaveBeenCalled();
+    });
+
+    it('shows an admin only folders with their own projects, sorted', async () => {
+      const res = await list(admin);
+
+      expect(res.status).toBe(200);
+      expect(res.body.map((f) => f.name)).toEqual(['Zebra']);
+      expect(db.Project.findAll).toHaveBeenCalledWith({
+        where: { id: { [Op.in]: [10] }, folderId: { [Op.ne]: null } },
+        attributes: ['folderId'],
+      });
+    });
+
+    it('shows an editor only folders with their own projects', async () => {
+      db.Project.findAll = vi.fn(async () => [
+        { folderId: 1 },
+        { folderId: 2 },
+      ]);
+      db.User.findAll = vi.fn(async () => [
+        { projectId: 10 },
+        { projectId: 11 },
+      ]);
+
+      const res = await list(editor);
+
+      expect(res.body.map((f) => f.name)).toEqual(['Appel', 'Zebra']);
+    });
+
+    it('hides a folder for an editor whose only project in it is project 1', async () => {
+      db.User.findAll = vi.fn(async () => [
+        { projectId: 1 },
+        { projectId: 10 },
+      ]);
+
+      const res = await list(editor);
+
+      expect(res.status).toBe(200);
+      const where = db.Project.findAll.mock.calls[0][0].where;
+      expect(where.id[Op.in]).toEqual([10]);
+    });
+
+    it('returns [] for an editor whose only project is project 1', async () => {
+      db.User.findAll = vi.fn(async () => [{ projectId: 1 }]);
+
+      const res = await list(editor);
+
+      expect(res.body).toEqual([]);
+      expect(db.Project.findAll).not.toHaveBeenCalled();
+    });
+
+    it('returns [] without querying projects for a user with no projects', async () => {
+      db.User.findAll = vi.fn(async () => []);
+
+      const res = await list(admin);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual([]);
+      expect(db.Project.findAll).not.toHaveBeenCalled();
+    });
+
+    it('passes a database error on as a 500', async () => {
+      db.User.findAll = vi.fn(async () => {
+        throw new Error('boom');
+      });
+
+      const res = await list(admin);
+
+      expect(res.status).toBe(500);
+    });
   });
 
   it('does not let an anonymous user list folders', async () => {
@@ -217,13 +298,13 @@ describe('project-folder routes', () => {
       return app;
     }
 
-    it('lets an admin list folders', async () => {
+    it('lets an admin list the folders with their own projects', async () => {
       const res = await request(createChainApp(admin)).get(
         '/api/project-folder'
       );
 
       expect(res.status).toBe(200);
-      expect(res.body.map((f) => f.name)).toEqual(['Appel', 'Zebra']);
+      expect(res.body.map((f) => f.name)).toEqual(['Zebra']);
     });
 
     it('lets an admin create a folder', async () => {

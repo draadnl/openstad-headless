@@ -20,6 +20,7 @@ const checkHostStatus = require('../services/checkHostStatus');
 const projectsWithIssues = require('../services/projects-with-issues');
 const authSettings = require('../util/auth-settings');
 const hasRole = require('../lib/sequelize-authorization/lib/hasRole');
+const { findOwnProjectIds } = require('../util/own-project-ids');
 const messageStreaming = require('../services/message-streaming');
 const {
   normalizeConfigForOpenstadClientSync,
@@ -348,17 +349,7 @@ async function listProjects(req, res, next) {
       !hasRole(req.user, 'superuser') &&
       !req.scope.includes('getBasicInformation')
     ) {
-      // first find all corresponding users for the current user, only where she is admin
-      let users = await db.User.findAll({
-        where: {
-          idpUser: {
-            identifier: req.user?.idpUser?.identifier || 'no identifier found',
-            provider: req.user?.idpUser?.provider || 'no provider found',
-          },
-          [Op.or]: [{ role: 'admin' }, { role: 'editor' }],
-        },
-      });
-      let projectIds = users.map((u) => u.projectId);
+      const projectIds = await findOwnProjectIds(req.user);
       where = { id: projectIds };
     }
 
