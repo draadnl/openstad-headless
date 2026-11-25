@@ -45,6 +45,10 @@ const sortFunctions = {
     (b.extraFunctionality?.canLike ? 1 : -1) -
     (a.extraFunctionality?.canLike ? 1 : -1),
   score: (a: any, b: any) => b.score - a.score,
+  widgetCount: (a: any, b: any) =>
+    Number(b.widgetCount || 0) - Number(a.widgetCount || 0),
+  issueCount: (a: any, b: any) =>
+    Number(b.issueCount || 0) - Number(a.issueCount || 0),
 };
 
 export const sortTable = (

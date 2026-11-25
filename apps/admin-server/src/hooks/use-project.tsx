@@ -1,4 +1,8 @@
-import { readJson, readSaved } from '@/lib/read-json';
+import {
+  buildCreateProjectBody,
+  readCreatedProject,
+} from '@/lib/create-project-body';
+import { readSaved } from '@/lib/read-json';
 import { validateProjectNumber } from '@/lib/validateProjectNumber';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
@@ -26,34 +30,15 @@ export function useProject(scopes?: Array<string>) {
       : null
   );
 
-  async function createProject(name: string) {
+  async function createProject(name: string, targetFolderId?: number | null) {
     const res = await fetch('/api/openstad/api/project', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        name,
-        config: {
-          auth: {
-            provider: {
-              openstad: {
-                name: `${name} normal`,
-                adapter: 'openstad',
-                authTypes: 'Url',
-              },
-              anonymous: {
-                name: `${name} anonymous`,
-                adapter: 'openstad',
-                authTypes: 'Anonymous',
-                requiredUserFields: 'postcode',
-              },
-            },
-          },
-        },
-      }),
+      body: JSON.stringify(buildCreateProjectBody(name, targetFolderId)),
     });
-    return readJson(res, 'Het project kon niet worden aangemaakt.');
+    return readCreatedProject(res);
   }
 
   async function importProject(payload: object) {

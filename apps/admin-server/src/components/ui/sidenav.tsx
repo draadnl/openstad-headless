@@ -1,6 +1,8 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
+import useProjectFolders from '@/hooks/use-project-folders';
+import { sidenavFolderItems } from '@/lib/project-folders';
 import { cn } from '@/lib/utils';
 import {
   AlertTriangle,
@@ -31,6 +33,14 @@ export function Sidenav({
   const [location, setLocation] = useState('');
   const sessionData = useContext(SessionContext);
   const adminRole = sessionData?.adminRole || sessionData?.role;
+  const { data: folders, error: foldersError } = useProjectFolders({
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+  });
+  const folderItems = sidenavFolderItems(foldersError ? [] : folders, {
+    pathname: router.pathname,
+    folderQuery: router.query.folder,
+  });
   const [pluginMenuItems, setPluginMenuItems] = useState<
     Array<{ label: string; href: string; role?: string }>
   >([]);
@@ -81,6 +91,26 @@ export function Sidenav({
             {narrow ? '' : 'Projecten'}
           </Button>
         </Link>
+        {narrow ? null : (
+          <ul aria-label="Mappen" className="max-h-64 overflow-y-auto pl-6">
+            {folderItems.map((item) => (
+              <li key={item.key}>
+                <Link
+                  href={item.href}
+                  title={item.label}
+                  aria-current={item.active ? 'page' : undefined}
+                  className={cn(
+                    'block truncate rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    item.active
+                      ? 'bg-secondary text-secondary-foreground'
+                      : null
+                  )}>
+                  {item.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
         {adminRole && hasRole({ role: adminRole as Role }, 'admin') ? (
           <Link href="/templates">
             <Button

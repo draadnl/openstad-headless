@@ -20,6 +20,7 @@ const checkHostStatus = require('../services/checkHostStatus');
 const projectsWithIssues = require('../services/projects-with-issues');
 const authSettings = require('../util/auth-settings');
 const hasRole = require('../lib/sequelize-authorization/lib/hasRole');
+const { findOwnProjectIds } = require('../util/own-project-ids');
 const messageStreaming = require('../services/message-streaming');
 const {
   normalizeConfigForOpenstadClientSync,
@@ -320,6 +321,9 @@ function setScope(req, res, next) {
     req.scope.push('includeInstallationUrls');
   }
 
+  req.includeCounts =
+    req.query.includeCounts === '1' || req.query.includeCounts === 'true';
+
   return next();
 }
 
@@ -348,17 +352,7 @@ async function listProjects(req, res, next) {
       !hasRole(req.user, 'superuser') &&
       !req.scope.includes('getBasicInformation')
     ) {
-      // first find all corresponding users for the current user, only where she is admin
-      let users = await db.User.findAll({
-        where: {
-          idpUser: {
-            identifier: req.user?.idpUser?.identifier || 'no identifier found',
-            provider: req.user?.idpUser?.provider || 'no provider found',
-          },
-          [Op.or]: [{ role: 'admin' }, { role: 'editor' }],
-        },
-      });
-      let projectIds = users.map((u) => u.projectId);
+      const projectIds = await findOwnProjectIds(req.user);
       where = { id: projectIds };
     }
 
@@ -367,11 +361,26 @@ async function listProjects(req, res, next) {
       ? req.scope.filter((scopeName) => scopeName !== 'excludeConfig')
       : req.scope;
 
-    let result = await db.Project.scope(listScope).findAndCountAll({
+    const findOptions = {
       offset: req.dbQuery.offset,
       limit: req.dbQuery.limit,
       where,
-    });
+    };
+
+    if (req.includeCounts && !req.scope.includes('getBasicInformation')) {
+      findOptions.attributes = {
+        include: [
+          [
+            Sequelize.literal(
+              '(SELECT COUNT(*) FROM widgets AS w WHERE w.projectId = project.id AND w.deletedAt IS NULL)'
+            ),
+            'widgetCount',
+          ],
+        ],
+      };
+    }
+
+    let result = await db.Project.scope(listScope).findAndCountAll(findOptions);
     if (req.user?.role === 'editor') {
       result.rows = result.rows.filter((project) => project.id !== 1);
     }
@@ -540,9 +549,41 @@ async function prepareDuplicationPayload(req, res, next) {
   }
 }
 
+async function validateTargetFolder(req, res, next) {
+  try {
+    const raw = req.body && req.body.targetFolderId;
+    if (raw === undefined || raw === null || raw === '') {
+      if (req.body) delete req.body.targetFolderId;
+      return next();
+    }
+
+    if (req.body.isDuplicateRequest === true) {
+      delete req.body.targetFolderId;
+      return next();
+    }
+
+    if (!hasRole(req.user, 'admin'))
+      throw createError(403, 'Je mag geen project in een map aanmaken');
+
+    const id = typeof raw === 'string' && raw.trim() !== '' ? Number(raw) : raw;
+    if (!Number.isInteger(id) || id < 1)
+      throw createError(400, 'Ongeldige map opgegeven');
+
+    const folder = await db.ProjectFolder.findByPk(id);
+    if (!folder) throw createError(400, 'Map bestaat niet');
+
+    req.targetFolderId = id;
+    delete req.body.targetFolderId;
+    return next();
+  } catch (err) {
+    return next(err);
+  }
+}
+
 function createProjectRecord(req, res, next) {
+  const { folderId, targetFolderId, ...body } = req.body;
   db.Project.create(
-    { emailConfig: {}, ...req.body },
+    { emailConfig: {}, ...body, folderId: req.targetFolderId ?? null },
     { skipDefaultStatuses: req.skipDefaultStatuses }
   )
     .then((result) => {
@@ -948,7 +989,7 @@ async function updateProjectRecord(req, res, next) {
   if ('url' in req.body && req.body.url != project.url)
     req.pendingMessages.push({ key: `project-urls-update`, value: 'event' });
 
-  let updateBody = req.body;
+  const { folderId, ...updateBody } = req.body;
 
   if (req.body.url && req.body.url !== project.url) {
     try {
@@ -976,7 +1017,7 @@ async function updateProjectRecord(req, res, next) {
   }
 
   project
-    .authorizeData(req.body, 'update', req.user)
+    .authorizeData(updateBody, 'update', req.user)
     .update(updateBody)
     .then(async (result) => {
       req.results = result;
@@ -1286,6 +1327,7 @@ module.exports = {
   serializeProjectsList,
   // create
   prepareDuplicationPayload,
+  validateTargetFolder,
   createProjectRecord,
   syncAuthProvidersAfterCreate,
   createDuplicatedData,

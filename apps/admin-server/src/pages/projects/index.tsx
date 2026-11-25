@@ -1,4 +1,6 @@
 import { SessionContext } from '@/auth-context';
+import { ProjectFolderDeleteDialog } from '@/components/project-folder-delete-dialog';
+import { ProjectFolderDialog } from '@/components/project-folder-dialog';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -10,9 +12,28 @@ import { Input } from '@/components/ui/input';
 import { PageLayout } from '@/components/ui/page-layout';
 import { sortTable } from '@/components/ui/sortTable';
 import { ListHeading, Paragraph } from '@/components/ui/typography';
+import useProjectFolders from '@/hooks/use-project-folders';
 import useTemplates from '@/hooks/use-template';
 import { HasAccess } from '@/lib/hasAccess';
-import { Check, ChevronRight, LayoutTemplate, Plus } from 'lucide-react';
+import {
+  groupProjectsByFolder,
+  looseProjects,
+  parseFolderQuery,
+  projectCreateHref,
+} from '@/lib/project-folders';
+import {
+  countIssuesByProject,
+  formatIsoDate,
+  participationLabels,
+  withOverviewCounts,
+} from '@/lib/project-overview-columns';
+import {
+  Check,
+  ChevronRight,
+  Folder,
+  LayoutTemplate,
+  Plus,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useContext, useEffect, useMemo, useState } from 'react';
@@ -27,26 +48,26 @@ type SearchableField = {
   getValue: (project: any) => string;
 };
 
+const OVERVIEW_GRID_COLUMNS =
+  'grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.75fr)_minmax(0,0.75fr)_minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]';
+
 const SEARCHABLE_FIELDS: SearchableField[] = [
   { key: 'name', label: 'Projectnaam', getValue: (p) => p?.name || '' },
   { key: 'url', label: 'URL', getValue: (p) => p?.url || '' },
   {
-    key: 'votes',
-    label: 'Stemmen',
-    getValue: (p) => (p?.config?.votes?.isActive === true ? 'Aan' : 'Uit'),
+    key: 'createdAt',
+    label: 'Aanmaakdatum',
+    getValue: (p) => formatIsoDate(p?.createdAt),
   },
   {
-    key: 'comments',
-    label: 'Reacties',
-    getValue: (p) => (p?.config?.comments?.canComment === true ? 'Aan' : 'Uit'),
+    key: 'participation',
+    label: 'Deelname',
+    getValue: (p) => participationLabels(p).join(', '),
   },
   {
     key: 'endDate',
-    label: 'Eind datum',
-    getValue: (p) => {
-      const date = p?.config?.project?.endDate;
-      return date ? new Date(date).toLocaleDateString('nl-NL') : '';
-    },
+    label: 'Einddatum',
+    getValue: (p) => formatIsoDate(p?.config?.project?.endDate),
   },
 ];
 
@@ -88,7 +109,15 @@ const applySearchFilter = (projects: any[], term: string, fieldKey: string) => {
 };
 
 export default function Projects() {
-  const { data } = projectListSwr();
+  const { data: listData } = projectListSwr({ includeCounts: true });
+  const { data: issuesData } = projectListSwr({ projectsWithIssues: true });
+  const data = useMemo(
+    () =>
+      listData && issuesData
+        ? withOverviewCounts(listData, countIssuesByProject(issuesData))
+        : listData,
+    [listData, issuesData]
+  );
   const router = useRouter();
 
   const [filterSearchType, setFilterSearchType] = useState('');
@@ -102,13 +131,39 @@ export default function Projects() {
     return applySearchFilter(result, searchTerm, filterSearchType);
   }, [data, statusFilter, searchTerm, filterSearchType]);
 
+  const sessionData = useContext(SessionContext);
+  const isSuperuser = sessionData?.role === 'superuser';
+
+  const {
+    data: folders,
+    createFolder,
+    updateFolder,
+    deleteFolder,
+  } = useProjectFolders();
+  const [folderDialogOpen, setFolderDialogOpen] = useState(false);
+  const [editFolderOpen, setEditFolderOpen] = useState(false);
+  const [deleteFolderOpen, setDeleteFolderOpen] = useState(false);
+  const folderId = parseFolderQuery(router.query.folder);
+  const openFolder = folderId
+    ? (folders || []).find((f) => f.id === folderId)
+    : undefined;
+
+  const grouped = useMemo(
+    () =>
+      groupProjectsByFolder(filteredData || [], folders || [], {
+        folderId,
+        hasSearch: searchTerm.length > 0,
+        isAdmin: isSuperuser,
+        allProjects: data || [],
+      }),
+    [filteredData, data, folders, folderId, searchTerm, isSuperuser]
+  );
+
   // Separate state for column sorting (sortTable mutates imperatively)
   const [sortedData, setSortedData] = useState<any[] | null>(null);
-  useEffect(() => setSortedData(null), [filteredData]);
+  useEffect(() => setSortedData(null), [grouped]);
 
-  const displayData = sortedData ?? filteredData;
-
-  const sessionData = useContext(SessionContext);
+  const displayData = sortedData ?? grouped.projects;
   const { createTemplateFromProject } = useTemplates();
 
   const [templateSource, setTemplateSource] = useState<any>(null);
@@ -165,12 +220,23 @@ export default function Projects() {
         ]}
         action={
           HasAccess(sessionData) && (
-            <Link href="/projects/create">
-              <Button variant="default" className="flex w-fit">
-                <Plus size="20" className="hidden lg:flex" />
-                Project toevoegen
-              </Button>
-            </Link>
+            <div className="flex gap-2">
+              {isSuperuser && (
+                <Button
+                  variant="secondary"
+                  className="flex w-fit"
+                  onClick={() => setFolderDialogOpen(true)}>
+                  <Folder size="20" className="hidden lg:flex" />
+                  Nieuwe map aanmaken
+                </Button>
+              )}
+              <Link href="/projects/create">
+                <Button variant="default" className="flex w-fit">
+                  <Plus size="20" className="hidden lg:flex" />
+                  Project toevoegen
+                </Button>
+              </Link>
+            </div>
           )
         }>
         <div className="container py-6">
@@ -221,8 +287,45 @@ export default function Projects() {
             </div>
           </div>
 
+          {folderId !== null && (
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <nav aria-label="Kruimelpad mappen" className="text-sm">
+                <Link href="/projects" className="underline">
+                  Alle projecten
+                </Link>
+                <span className="mx-2" aria-hidden="true">
+                  /
+                </span>
+                <span aria-current="page" className="font-medium">
+                  {openFolder?.name ?? 'Map'}
+                </span>
+              </nav>
+              {isSuperuser && openFolder && (
+                <div className="flex gap-2">
+                  <Link href={projectCreateHref(openFolder.id)}>
+                    <Button variant="default" className="flex w-fit">
+                      <Plus size="20" className="hidden lg:flex" />
+                      Project aanmaken in map
+                    </Button>
+                  </Link>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setEditFolderOpen(true)}>
+                    Map bewerken
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setDeleteFolderOpen(true)}>
+                    Map verwijderen
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="p-6 bg-white rounded-md clear-right">
-            <div className="grid grid-cols-2 lg:grid-cols-8 items-center py-2 px-2 border-b border-border">
+            <div
+              className={`grid ${OVERVIEW_GRID_COLUMNS} items-center py-2 px-2 border-b border-border`}>
               <ListHeading className="hidden lg:flex">
                 <button
                   className="filter-button"
@@ -236,7 +339,16 @@ export default function Projects() {
                 <button
                   className="filter-button"
                   onClick={(e) =>
-                    setSortedData(sortTable('issues', e, displayData))
+                    setSortedData(sortTable('createdAt', e, displayData))
+                  }>
+                  Aanmaakdatum
+                </button>
+              </ListHeading>
+              <ListHeading className="hidden lg:flex">
+                <button
+                  className="filter-button"
+                  onClick={(e) =>
+                    setSortedData(sortTable('issueCount', e, displayData))
                   }>
                   Problemen
                 </button>
@@ -245,29 +357,12 @@ export default function Projects() {
                 <button
                   className="filter-button"
                   onClick={(e) =>
-                    setSortedData(sortTable('votesIsActive', e, displayData))
+                    setSortedData(sortTable('widgetCount', e, displayData))
                   }>
-                  Stemmen
+                  Widgets
                 </button>
               </ListHeading>
-              <ListHeading className="hidden lg:flex">
-                <button
-                  className="filter-button"
-                  onClick={(e) =>
-                    setSortedData(sortTable('commentsIsActive', e, displayData))
-                  }>
-                  Reacties
-                </button>
-              </ListHeading>
-              <ListHeading className="hidden lg:flex">
-                <button
-                  className="filter-button"
-                  onClick={(e) =>
-                    setSortedData(sortTable('resources', e, displayData))
-                  }>
-                  Inzendingen
-                </button>
-              </ListHeading>
+              <ListHeading className="hidden lg:flex">Deelname</ListHeading>
               <ListHeading className="hidden lg:flex">
                 <button
                   className="filter-button"
@@ -288,51 +383,22 @@ export default function Projects() {
               </ListHeading>
             </div>
             <ul>
-              {displayData?.map((project: any) => (
+              {grouped.folders.map(({ folder, count }) => (
                 <li
-                  className="grid grid-cols-2 lg:grid-cols-8 items-center py-3 px-2 h-16 hover:bg-secondary-background hover:cursor-pointer border-b border-border gap-2"
-                  key={project.id}
-                  onClick={() =>
-                    router.push(`${router.asPath}/${project.id}/widgets`)
-                  }>
-                  <Paragraph className="truncate">
-                    {fieldsByKey.name.getValue(project)}
-                  </Paragraph>
-                  <Paragraph className="hidden lg:flex truncate">
-                    Geen
-                  </Paragraph>
-                  <Paragraph className="hidden lg:flex truncate">
-                    {fieldsByKey.votes.getValue(project)}
-                  </Paragraph>
-                  <Paragraph className="hidden lg:flex truncate">
-                    {fieldsByKey.comments.getValue(project)}
-                  </Paragraph>
-                  <Paragraph className="hidden lg:flex truncate">
-                    Open
-                  </Paragraph>
-                  <Paragraph className="hidden lg:flex truncate -mr-16">
-                    {fieldsByKey.endDate.getValue(project)}
-                  </Paragraph>
-                  <Paragraph className="hidden lg:flex truncate">
-                    {fieldsByKey.url.getValue(project)}
-                  </Paragraph>
-                  <Paragraph className="flex items-center justify-end gap-2">
-                    {HasAccess(sessionData) && (
-                      <button
-                        type="button"
-                        title="Bewaar als template"
-                        aria-label={`Bewaar project ${
-                          project.name || ''
-                        } als template`}
-                        className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-gray-100"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setTemplateName(project.name || '');
-                          setTemplateSource(project);
-                        }}>
-                        <LayoutTemplate strokeWidth={1.5} className="w-5 h-5" />
-                      </button>
-                    )}
+                  key={`folder-${folder.id}`}
+                  className={`grid ${OVERVIEW_GRID_COLUMNS} items-center py-3 px-2 h-16 bg-gray-100 hover:bg-gray-200 border-b border-border gap-2`}>
+                  <Link
+                    href={`/projects?folder=${folder.id}`}
+                    className="col-span-2 lg:col-span-7 flex items-center gap-3 h-full">
+                    <Folder strokeWidth={1.5} className="w-5 h-5 shrink-0" />
+                    <Paragraph className="truncate font-medium">
+                      {folder.name}
+                    </Paragraph>
+                    <Paragraph className="text-muted-foreground">
+                      {count} {count === 1 ? 'project' : 'projecten'}
+                    </Paragraph>
+                  </Link>
+                  <Paragraph className="flex items-center justify-end">
                     <ChevronRight
                       strokeWidth={1.5}
                       className="w-5 h-5 my-auto"
@@ -340,9 +406,120 @@ export default function Projects() {
                   </Paragraph>
                 </li>
               ))}
+              {displayData?.map((project: any) => {
+                const participation =
+                  fieldsByKey.participation.getValue(project);
+                const endDate = fieldsByKey.endDate.getValue(project);
+                const projectUrl = fieldsByKey.url.getValue(project);
+                return (
+                  <li
+                    className={`grid ${OVERVIEW_GRID_COLUMNS} items-center py-3 px-2 h-16 hover:bg-secondary-background hover:cursor-pointer border-b border-border gap-2`}
+                    key={project.id}
+                    onClick={() =>
+                      router.push(`/projects/${project.id}/widgets`)
+                    }>
+                    <Paragraph className="truncate">
+                      {fieldsByKey.name.getValue(project)}
+                    </Paragraph>
+                    <Paragraph className="hidden lg:flex truncate">
+                      {fieldsByKey.createdAt.getValue(project)}
+                    </Paragraph>
+                    <Paragraph className="hidden lg:flex truncate">
+                      {project.issueCount ===
+                      undefined ? null : project.issueCount > 0 ? (
+                        <Link
+                          href="/issues"
+                          className="underline"
+                          aria-label={`${project.issueCount} problemen bekijken`}
+                          onClick={(e) => e.stopPropagation()}>
+                          {project.issueCount}
+                        </Link>
+                      ) : (
+                        0
+                      )}
+                    </Paragraph>
+                    <Paragraph className="hidden lg:flex truncate">
+                      {Number(project.widgetCount ?? 0)}
+                    </Paragraph>
+                    <Paragraph
+                      className="hidden lg:flex min-w-0"
+                      title={participation || undefined}>
+                      <span className="block truncate">{participation}</span>
+                    </Paragraph>
+                    <Paragraph
+                      className="hidden lg:flex min-w-0"
+                      title={endDate || undefined}>
+                      <span className="block truncate">{endDate}</span>
+                    </Paragraph>
+                    <Paragraph
+                      className="hidden lg:flex min-w-0"
+                      title={projectUrl || undefined}>
+                      <span className="block truncate">{projectUrl}</span>
+                    </Paragraph>
+                    <Paragraph className="flex items-center justify-end gap-2">
+                      {HasAccess(sessionData) && (
+                        <button
+                          type="button"
+                          title="Bewaar als template"
+                          aria-label={`Bewaar project ${
+                            project.name || ''
+                          } als template`}
+                          className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-gray-100"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setTemplateName(project.name || '');
+                            setTemplateSource(project);
+                          }}>
+                          <LayoutTemplate
+                            strokeWidth={1.5}
+                            className="w-5 h-5"
+                          />
+                        </button>
+                      )}
+                      <ChevronRight
+                        strokeWidth={1.5}
+                        className="w-5 h-5 my-auto"
+                      />
+                    </Paragraph>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         </div>
+
+        <ProjectFolderDialog
+          open={folderDialogOpen}
+          onOpenChange={setFolderDialogOpen}
+          projects={looseProjects(data || [])}
+          onSubmit={createFolder}
+        />
+
+        {folderId !== null && openFolder && (
+          <ProjectFolderDialog
+            mode="edit"
+            open={editFolderOpen}
+            onOpenChange={setEditFolderOpen}
+            projects={data || []}
+            initialName={openFolder.name}
+            initialProjectIds={(data || [])
+              .filter((p: any) => p.folderId === folderId)
+              .map((p: any) => p.id)}
+            onSubmit={(name, ids) => updateFolder(folderId, name, ids)}
+          />
+        )}
+
+        {folderId !== null && openFolder && (
+          <ProjectFolderDeleteDialog
+            open={deleteFolderOpen}
+            onOpenChange={setDeleteFolderOpen}
+            folderName={openFolder.name}
+            onConfirm={async () => {
+              await deleteFolder(folderId);
+              router.push('/projects');
+            }}
+          />
+        )}
 
         <Dialog
           open={!!templateSource}

@@ -12,7 +12,9 @@ import { PageLayout } from '@/components/ui/page-layout';
 import { Separator } from '@/components/ui/separator';
 import { Heading } from '@/components/ui/typography';
 import { useProject } from '@/hooks/use-project';
+import useProjectFolders from '@/hooks/use-project-folders';
 import useTemplates, { ProjectTemplate } from '@/hooks/use-template';
+import { findFolderById, parseFolderQuery } from '@/lib/project-folders';
 import {
   MissingPart,
   NotImportedPart,
@@ -20,7 +22,7 @@ import {
   buildProjectImportPayload,
 } from '@/lib/project-import';
 import { zodResolver } from '@hookform/resolvers/zod';
-import router from 'next/router';
+import router, { useRouter } from 'next/router';
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
@@ -59,7 +61,10 @@ const NOT_IMPORTED_LABELS: Record<NotImportedPart, string> = {
 
 export default function CreateProject() {
   const { createProject, importProject } = useProject();
+  const { query } = useRouter();
   const { data: templates } = useTemplates();
+  const { data: folders } = useProjectFolders({ revalidateOnFocus: false });
+  const targetFolder = findFolderById(folders, parseFolderQuery(query.folder));
   const [file, setFile] = React.useState('');
   const [templateCreating, setTemplateCreating] = React.useState(false);
   const [templateErrors, setTemplateErrors] = React.useState<
@@ -95,21 +100,17 @@ export default function CreateProject() {
   }
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    const project = await createProject(values.projectName);
-
-    if (project && project?.status === 500) {
-      toast.error('Je hebt geen toegang tot deze actie.');
+    const targetFolderId = targetFolder?.id ?? null;
+    let project;
+    try {
+      project = await createProject(values.projectName, targetFolderId);
+    } catch (error: any) {
+      toast.error(error?.message || 'Er is helaas iets mis gegaan.');
       return;
     }
 
-    if (project) {
-      toast.success('Project aangemaakt!');
-      const projectId = project?.id || project;
-
-      router.push(`/projects/${projectId}/settings`);
-    } else {
-      toast.error('Er is helaas iets mis gegaan.');
-    }
+    toast.success('Project aangemaakt!');
+    router.push(`/projects/${project.id}/settings`);
   }
 
   async function onCreateFromTemplate(
@@ -278,6 +279,11 @@ export default function CreateProject() {
         <div className="container py-6">
           <Form {...form} className="p-6 bg-white rounded-md">
             <Heading size="xl">Project toevoegen</Heading>
+            {targetFolder && (
+              <p className="mt-2">
+                Dit project komt in de map <strong>{targetFolder.name}</strong>.
+              </p>
+            )}
             <Separator className="my-4" />
             <form
               onSubmit={form.handleSubmit(onSubmit)}

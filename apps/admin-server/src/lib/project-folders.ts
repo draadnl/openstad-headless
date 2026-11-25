@@ -1,0 +1,136 @@
+export type FolderLike = { id: number; name: string };
+
+export type ProjectLike = {
+  id: number;
+  createdAt?: string;
+  folderId?: number | null;
+  [key: string]: any;
+};
+
+export type FolderRow<F extends FolderLike> = { folder: F; count: number };
+
+type GroupOptions = {
+  folderId?: number | null;
+  hasSearch?: boolean;
+  isAdmin?: boolean;
+  allProjects?: ProjectLike[];
+};
+
+export function sortNewestFirst<P extends ProjectLike>(projects: P[]): P[] {
+  const time = (p: P) => {
+    const value = p?.createdAt ? new Date(p.createdAt).getTime() : 0;
+    return Number.isNaN(value) ? 0 : value;
+  };
+  return [...projects].sort((a, b) => time(b) - time(a));
+}
+
+export function sortFoldersByName<F extends FolderLike>(folders: F[]): F[] {
+  return [...folders].sort((a, b) =>
+    String(a.name).localeCompare(String(b.name))
+  );
+}
+
+export function groupProjectsByFolder<
+  P extends ProjectLike,
+  F extends FolderLike,
+>(
+  projects: P[],
+  folders: F[],
+  {
+    folderId = null,
+    hasSearch = false,
+    isAdmin = false,
+    allProjects,
+  }: GroupOptions = {}
+): { folders: FolderRow<F>[]; projects: P[] } {
+  const sorted = sortNewestFirst(projects || []);
+
+  if (folderId !== null && folderId !== undefined) {
+    return {
+      folders: [],
+      projects: sorted.filter((p) => p.folderId === folderId),
+    };
+  }
+
+  if (hasSearch) return { folders: [], projects: sorted };
+
+  const knownFolderIds = new Set((folders || []).map((f) => f.id));
+  const counts = new Map<number, number>();
+  const loose: P[] = [];
+
+  for (const project of sorted) {
+    if (project.folderId != null && knownFolderIds.has(project.folderId)) {
+      counts.set(project.folderId, (counts.get(project.folderId) || 0) + 1);
+    } else {
+      loose.push(project);
+    }
+  }
+
+  const filled = new Set(
+    (allProjects || sorted).map((p) => p.folderId).filter((id) => id != null)
+  );
+
+  const rows = sortFoldersByName(folders || [])
+    .map((folder) => ({ folder, count: counts.get(folder.id) || 0 }))
+    .filter((row) => row.count > 0 || (isAdmin && !filled.has(row.folder.id)));
+
+  return { folders: rows, projects: loose };
+}
+
+export function looseProjects<P extends ProjectLike>(projects: P[]): P[] {
+  return (projects || []).filter((p) => p.folderId == null);
+}
+
+export function parseFolderQuery(
+  value: string | string[] | undefined
+): number | null {
+  const first = Array.isArray(value) ? value[0] : value;
+  return first && /^\d+$/.test(first) ? Number(first) : null;
+}
+
+export type SidenavFolderItem = {
+  key: string;
+  label: string;
+  href: string;
+  active: boolean;
+};
+
+export function sidenavFolderItems<F extends FolderLike>(
+  folders: F[] | undefined,
+  {
+    pathname,
+    folderQuery,
+  }: { pathname: string; folderQuery?: string | string[] }
+): SidenavFolderItem[] {
+  const onOverview = pathname === '/projects';
+  const activeId = parseFolderQuery(folderQuery);
+
+  return [
+    {
+      key: 'all',
+      label: 'Alle projecten',
+      href: '/projects',
+      active: onOverview && activeId === null,
+    },
+    ...sortFoldersByName(folders || []).map((folder) => ({
+      key: `folder-${folder.id}`,
+      label: folder.name,
+      href: `/projects?folder=${folder.id}`,
+      active: onOverview && activeId === folder.id,
+    })),
+  ];
+}
+
+export function projectCreateHref(folderId: number | null): string {
+  return folderId === null || folderId === undefined
+    ? '/projects/create'
+    : `/projects/create?folder=${folderId}`;
+}
+
+export function findFolderById<F extends FolderLike>(
+  folders: F[] | undefined,
+  id: number | null
+): F | null {
+  if (id === null || id === undefined) return null;
+  return (folders || []).find((f) => f.id === id) || null;
+}

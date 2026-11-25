@@ -46,9 +46,17 @@ vi.mock('next/router', () => ({
 vi.mock('@/components/ui/page-layout', () => ({
   PageLayout: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
+const create = vi.hoisted(() => ({
+  error: null as string | null,
+  toastError: vi.fn(),
+}));
+
 vi.mock('@/hooks/use-project', () => ({
   useProject: () => ({
-    createProject: async () => ({ id: 50 }),
+    createProject: async () => {
+      if (create.error) throw new Error(create.error);
+      return { id: 50 };
+    },
     importProject: async () => ({ id: 51 }),
   }),
 }));
@@ -58,7 +66,7 @@ vi.mock('@/hooks/use-template', () => ({
   }),
 }));
 vi.mock('react-hot-toast', () => ({
-  default: { success() {}, error() {} },
+  default: { success() {}, error: create.toastError },
 }));
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -175,5 +183,35 @@ describe('creating a project from a template', () => {
     expect(controller.isRegistered).toBe(false);
     expect(confirmSpy).not.toHaveBeenCalled();
     expect(nav.router.pushes).toEqual(['/projects/50/settings']);
+  });
+
+  it('shows the API error and stays on the page when the create fails', async () => {
+    create.error = 'Map bestaat niet';
+    act(() =>
+      root.render(
+        <SaveControllerProvider>
+          <Bar />
+          <CreateProject />
+        </SaveControllerProvider>
+      )
+    );
+    await settle();
+    const input = container.querySelector(
+      'input[placeholder="Naam"]'
+    ) as HTMLInputElement;
+    setInput(input, 'Mijn nieuw project');
+    await settle();
+    const save = Array.from(container.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Opslaan'
+    ) as HTMLButtonElement;
+    await act(async () => {
+      save.click();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    await settle();
+
+    expect(create.toastError).toHaveBeenCalledWith('Map bestaat niet');
+    expect(nav.router.pushes).toEqual([]);
+    create.error = null;
   });
 });

@@ -176,6 +176,16 @@ module.exports = function (db, sequelize, DataTypes) {
         allowNull: true,
       },
 
+      folderId: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: null,
+        auth: {
+          viewableBy: 'editor',
+          updateableBy: 'admin',
+        },
+      },
+
       auditIncidentAt: {
         type: DataTypes.DATE,
         allowNull: true,
@@ -399,6 +409,10 @@ module.exports = function (db, sequelize, DataTypes) {
       hooks: true,
     });
     this.belongsTo(models.Area, { onDelete: 'CASCADE' });
+    this.belongsTo(models.ProjectFolder, {
+      foreignKey: 'folderId',
+      onDelete: 'SET NULL',
+    });
   };
 
   Project.prototype.willAnonymizeAllUsers = async function () {
