@@ -15,7 +15,11 @@ import { ListHeading, Paragraph } from '@/components/ui/typography';
 import useProjectFolders from '@/hooks/use-project-folders';
 import useTemplates from '@/hooks/use-template';
 import { HasAccess } from '@/lib/hasAccess';
-import { groupProjectsByFolder, parseFolderQuery } from '@/lib/project-folders';
+import {
+  groupProjectsByFolder,
+  parseFolderQuery,
+  projectCreateHref,
+} from '@/lib/project-folders';
 import {
   Check,
   ChevronRight,
@@ -281,6 +285,12 @@ export default function Projects() {
               </nav>
               {isAdmin && openFolder && (
                 <div className="flex gap-2">
+                  <Link href={projectCreateHref(openFolder.id)}>
+                    <Button variant="default" className="flex w-fit">
+                      <Plus size="20" className="hidden lg:flex" />
+                      Project aanmaken in map
+                    </Button>
+                  </Link>
                   <Button
                     variant="secondary"
                     onClick={() => setEditFolderOpen(true)}>

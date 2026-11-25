@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  findFolderById,
   groupProjectsByFolder,
   parseFolderQuery,
+  projectCreateHref,
   sidenavFolderItems,
   sortNewestFirst,
 } from './project-folders';
@@ -146,5 +148,29 @@ describe('sidenavFolderItems', () => {
       folderQuery: undefined,
     });
     expect(items.some((i) => i.active)).toBe(false);
+  });
+});
+
+describe('projectCreateHref', () => {
+  it('links to the plain page without a folder', () => {
+    expect(projectCreateHref(null)).toBe('/projects/create');
+  });
+  it('adds the folder id', () => {
+    expect(projectCreateHref(5)).toBe('/projects/create?folder=5');
+  });
+});
+
+describe('findFolderById', () => {
+  const list = [
+    { id: 1, name: 'A' },
+    { id: 2, name: 'B' },
+  ];
+  it('returns null for null, unknown id or missing list', () => {
+    expect(findFolderById(list, null)).toBeNull();
+    expect(findFolderById(list, 9)).toBeNull();
+    expect(findFolderById(undefined, 1)).toBeNull();
+  });
+  it('returns the folder for a known id', () => {
+    expect(findFolderById(list, 2)).toEqual({ id: 2, name: 'B' });
   });
 });

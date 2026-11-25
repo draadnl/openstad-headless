@@ -103,3 +103,17 @@ export function sidenavFolderItems<F extends FolderLike>(
       })),
   ];
 }
+
+export function projectCreateHref(folderId: number | null): string {
+  return folderId === null || folderId === undefined
+    ? '/projects/create'
+    : `/projects/create?folder=${folderId}`;
+}
+
+export function findFolderById<F extends FolderLike>(
+  folders: F[] | undefined,
+  id: number | null
+): F | null {
+  if (id === null || id === undefined) return null;
+  return (folders || []).find((f) => f.id === id) || null;
+}

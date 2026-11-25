@@ -531,10 +531,41 @@ async function prepareDuplicationPayload(req, res, next) {
   }
 }
 
+async function validateTargetFolder(req, res, next) {
+  try {
+    const raw = req.body && req.body.targetFolderId;
+    if (raw === undefined || raw === null || raw === '') {
+      if (req.body) delete req.body.targetFolderId;
+      return next();
+    }
+
+    if (req.body.isDuplicateRequest === true) {
+      delete req.body.targetFolderId;
+      return next();
+    }
+
+    if (!hasRole(req.user, 'admin'))
+      throw createError(403, 'Je mag geen project in een map aanmaken');
+
+    const id = typeof raw === 'string' && raw.trim() !== '' ? Number(raw) : raw;
+    if (!Number.isInteger(id) || id < 1)
+      throw createError(400, 'Ongeldige map opgegeven');
+
+    const folder = await db.ProjectFolder.findByPk(id);
+    if (!folder) throw createError(400, 'Map bestaat niet');
+
+    req.targetFolderId = id;
+    delete req.body.targetFolderId;
+    return next();
+  } catch (err) {
+    return next(err);
+  }
+}
+
 function createProjectRecord(req, res, next) {
-  const { folderId, ...body } = req.body;
+  const { folderId, targetFolderId, ...body } = req.body;
   db.Project.create(
-    { emailConfig: {}, ...body },
+    { emailConfig: {}, ...body, folderId: req.targetFolderId ?? null },
     { skipDefaultStatuses: req.skipDefaultStatuses }
   )
     .then((result) => {
@@ -1278,6 +1309,7 @@ module.exports = {
   serializeProjectsList,
   // create
   prepareDuplicationPayload,
+  validateTargetFolder,
   createProjectRecord,
   syncAuthProvidersAfterCreate,
   createDuplicatedData,
