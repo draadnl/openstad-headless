@@ -155,6 +155,17 @@ describe('project-folder routes', () => {
     );
   });
 
+  it('saves < and & in the name as plain text', async () => {
+    await request(createApp(admin))
+      .post('/project-folder')
+      .send({ name: 'Kosten < 5 & B & C' });
+
+    expect(db.ProjectFolder.create).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Kosten < 5 & B & C' }),
+      expect.anything()
+    );
+  });
+
   it('rejects projectIds that are not whole numbers', async () => {
     const res = await request(createApp(admin))
       .post('/project-folder')

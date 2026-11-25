@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildCreateProjectBody,
-  createProjectOutcome,
+  readCreatedProject,
 } from './create-project-body';
 
 describe('buildCreateProjectBody', () => {
@@ -27,30 +27,34 @@ describe('buildCreateProjectBody', () => {
   });
 });
 
-describe('createProjectOutcome', () => {
-  it('passes the new project id on', () => {
-    expect(createProjectOutcome({ id: 41, name: 'Plan' })).toEqual({
-      ok: true,
-      id: 41,
-    });
+const response = (status: number, body: unknown) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
   });
 
-  it('shows the API message for a rejected folder', () => {
-    expect(
-      createProjectOutcome({ status: 400, message: 'Map bestaat niet' })
-    ).toEqual({ ok: false, message: 'Map bestaat niet' });
+describe('readCreatedProject', () => {
+  it('returns the new project', async () => {
+    await expect(
+      readCreatedProject(response(201, { id: 41, name: 'Plan' }))
+    ).resolves.toEqual({ id: 41, name: 'Plan' });
   });
 
-  it('keeps the no-access message for a 500', () => {
-    expect(
-      createProjectOutcome({ status: 500, message: 'You cannot do this' })
-    ).toEqual({ ok: false, message: 'Je hebt geen toegang tot deze actie.' });
+  it('throws the API message for a rejected folder', async () => {
+    await expect(
+      readCreatedProject(response(400, { message: 'Map bestaat niet' }))
+    ).rejects.toThrow('Map bestaat niet');
   });
 
-  it.each([null, undefined, {}, ''])('fails without an id for %j', (v) => {
-    expect(createProjectOutcome(v)).toEqual({
-      ok: false,
-      message: 'Er is helaas iets mis gegaan.',
-    });
+  it.each([403, 500])('throws the no-access message for %i', async (status) => {
+    await expect(
+      readCreatedProject(response(status, { message: 'You cannot do this' }))
+    ).rejects.toThrow('Je hebt geen toegang tot deze actie.');
+  });
+
+  it('throws when the answer has no id', async () => {
+    await expect(readCreatedProject(response(200, {}))).rejects.toThrow(
+      'Er is helaas iets mis gegaan.'
+    );
   });
 });

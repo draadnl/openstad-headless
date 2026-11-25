@@ -13,6 +13,7 @@ type GroupOptions = {
   folderId?: number | null;
   hasSearch?: boolean;
   isAdmin?: boolean;
+  allProjects?: ProjectLike[];
 };
 
 export function sortNewestFirst<P extends ProjectLike>(projects: P[]): P[] {
@@ -23,13 +24,24 @@ export function sortNewestFirst<P extends ProjectLike>(projects: P[]): P[] {
   return [...projects].sort((a, b) => time(b) - time(a));
 }
 
+export function sortFoldersByName<F extends FolderLike>(folders: F[]): F[] {
+  return [...folders].sort((a, b) =>
+    String(a.name).localeCompare(String(b.name))
+  );
+}
+
 export function groupProjectsByFolder<
   P extends ProjectLike,
   F extends FolderLike,
 >(
   projects: P[],
   folders: F[],
-  { folderId = null, hasSearch = false, isAdmin = false }: GroupOptions = {}
+  {
+    folderId = null,
+    hasSearch = false,
+    isAdmin = false,
+    allProjects,
+  }: GroupOptions = {}
 ): { folders: FolderRow<F>[]; projects: P[] } {
   const sorted = sortNewestFirst(projects || []);
 
@@ -54,10 +66,13 @@ export function groupProjectsByFolder<
     }
   }
 
-  const rows = [...(folders || [])]
-    .sort((a, b) => String(a.name).localeCompare(String(b.name)))
+  const filled = new Set(
+    (allProjects || sorted).map((p) => p.folderId).filter((id) => id != null)
+  );
+
+  const rows = sortFoldersByName(folders || [])
     .map((folder) => ({ folder, count: counts.get(folder.id) || 0 }))
-    .filter((row) => isAdmin || row.count > 0);
+    .filter((row) => row.count > 0 || (isAdmin && !filled.has(row.folder.id)));
 
   return { folders: rows, projects: loose };
 }
@@ -97,14 +112,12 @@ export function sidenavFolderItems<F extends FolderLike>(
       href: '/projects',
       active: onOverview && activeId === null,
     },
-    ...[...(folders || [])]
-      .sort((a, b) => String(a.name).localeCompare(String(b.name)))
-      .map((folder) => ({
-        key: `folder-${folder.id}`,
-        label: folder.name,
-        href: `/projects?folder=${folder.id}`,
-        active: onOverview && activeId === folder.id,
-      })),
+    ...sortFoldersByName(folders || []).map((folder) => ({
+      key: `folder-${folder.id}`,
+      label: folder.name,
+      href: `/projects?folder=${folder.id}`,
+      active: onOverview && activeId === folder.id,
+    })),
   ];
 }
 

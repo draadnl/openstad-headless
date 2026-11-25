@@ -13,6 +13,10 @@ describe('formatIsoDate', () => {
     expect(formatIsoDate(d.toISOString())).toBe('2026-10-31');
   });
 
+  it('keeps a date-only string as it is', () => {
+    expect(formatIsoDate('2027-07-28')).toBe('2027-07-28');
+  });
+
   it('formats a Date', () => {
     expect(formatIsoDate(new Date(2026, 0, 5))).toBe('2026-01-05');
   });

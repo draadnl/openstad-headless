@@ -14,7 +14,6 @@ import { Heading } from '@/components/ui/typography';
 import { useProject } from '@/hooks/use-project';
 import useProjectFolders from '@/hooks/use-project-folders';
 import useTemplates, { ProjectTemplate } from '@/hooks/use-template';
-import { createProjectOutcome } from '@/lib/create-project-body';
 import { findFolderById, parseFolderQuery } from '@/lib/project-folders';
 import {
   MissingPart,
@@ -102,17 +101,16 @@ export default function CreateProject() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     const targetFolderId = targetFolder?.id ?? null;
-    const outcome = createProjectOutcome(
-      await createProject(values.projectName, targetFolderId)
-    );
-
-    if (!outcome.ok) {
-      toast.error(outcome.message);
+    let project;
+    try {
+      project = await createProject(values.projectName, targetFolderId);
+    } catch (error: any) {
+      toast.error(error?.message || 'Er is helaas iets mis gegaan.');
       return;
     }
 
     toast.success('Project aangemaakt!');
-    router.push(`/projects/${outcome.id}/settings`);
+    router.push(`/projects/${project.id}/settings`);
   }
 
   async function onCreateFromTemplate(

@@ -154,8 +154,9 @@ export default function Projects() {
         folderId,
         hasSearch: searchTerm.length > 0,
         isAdmin: isSuperuser,
+        allProjects: data || [],
       }),
-    [filteredData, folders, folderId, searchTerm, isSuperuser]
+    [filteredData, data, folders, folderId, searchTerm, isSuperuser]
   );
 
   // Separate state for column sorting (sortTable mutates imperatively)

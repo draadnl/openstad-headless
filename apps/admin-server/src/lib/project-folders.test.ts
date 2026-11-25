@@ -7,6 +7,7 @@ import {
   parseFolderQuery,
   projectCreateHref,
   sidenavFolderItems,
+  sortFoldersByName,
   sortNewestFirst,
 } from './project-folders';
 
@@ -84,6 +85,15 @@ describe('groupProjectsByFolder', () => {
     });
     expect(result.folders).toEqual([]);
     expect(result.projects.map((p) => p.id)).toEqual([12]);
+  });
+
+  it('hides a folder whose projects are all filtered out, keeps an empty one', () => {
+    const filtered = projects.filter((p) => p.id !== 12);
+    const result = groupProjectsByFolder(filtered, folders, {
+      isAdmin: true,
+      allProjects: projects,
+    });
+    expect(result.folders.map((r) => r.folder.id)).toEqual([3, 1]);
   });
 
   it('treats a project with an unknown folder as loose', () => {
@@ -193,5 +203,17 @@ describe('looseProjects', () => {
 
   it('handles missing input', () => {
     expect(looseProjects(undefined as any)).toEqual([]);
+  });
+});
+
+describe('sortFoldersByName', () => {
+  it('sorts by name without changing the input', () => {
+    const input = [...folders];
+    expect(sortFoldersByName(input).map((f) => f.name)).toEqual([
+      'Beheer',
+      'Leeg',
+      'Templates',
+    ]);
+    expect(input).toEqual(folders);
   });
 });

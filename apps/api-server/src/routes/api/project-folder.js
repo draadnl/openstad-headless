@@ -2,14 +2,14 @@ const createError = require('http-errors');
 const { Op } = require('sequelize');
 const db = require('../../db');
 const auth = require('../../middleware/sequelize-authorization-middleware');
-const sanitize = require('../../util/sanitize');
+const { plainTitle } = require('../../util/plain-title');
 const { findOwnProjectIds } = require('../../util/own-project-ids');
 
 const express = require('express');
 const router = express.Router({ mergeParams: true });
 
 function parseFolderBody(body, { projectIdsOptional = false } = {}) {
-  const name = sanitize.title(String((body && body.name) || '').trim()).trim();
+  const name = plainTitle(body && body.name);
   if (!name) throw createError(400, 'Geen naam opgegeven');
   if (name.length > 255) throw createError(400, 'Naam is te lang');
 

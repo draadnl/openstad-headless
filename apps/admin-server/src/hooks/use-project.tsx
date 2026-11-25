@@ -1,5 +1,8 @@
-import { buildCreateProjectBody } from '@/lib/create-project-body';
-import { readJson, readSaved } from '@/lib/read-json';
+import {
+  buildCreateProjectBody,
+  readCreatedProject,
+} from '@/lib/create-project-body';
+import { readSaved } from '@/lib/read-json';
 import { validateProjectNumber } from '@/lib/validateProjectNumber';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
@@ -35,7 +38,7 @@ export function useProject(scopes?: Array<string>) {
       },
       body: JSON.stringify(buildCreateProjectBody(name, targetFolderId)),
     });
-    return readJson(res, 'Het project kon niet worden aangemaakt.');
+    return readCreatedProject(res);
   }
 
   async function importProject(payload: object) {

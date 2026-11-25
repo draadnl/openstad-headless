@@ -1,4 +1,4 @@
-const sanitize = require('../util/sanitize');
+const { plainTitle } = require('../util/plain-title');
 
 module.exports = function (db, sequelize, DataTypes) {
   const ProjectFolder = sequelize.define(
@@ -8,7 +8,7 @@ module.exports = function (db, sequelize, DataTypes) {
         type: DataTypes.STRING(255),
         allowNull: false,
         set: function (text) {
-          this.setDataValue('name', sanitize.title(String(text || '').trim()));
+          this.setDataValue('name', plainTitle(text));
         },
       },
 
