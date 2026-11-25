@@ -2,6 +2,7 @@ import express from 'express';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Op } from 'sequelize';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -21,6 +22,7 @@ const originals = {
   update: db.Project.update,
   create: db.ProjectFolder.create,
   findAll: db.ProjectFolder.findAll,
+  findByPk: db.ProjectFolder.findByPk,
 };
 
 function createApp(user) {
@@ -41,10 +43,12 @@ function createApp(user) {
 const admin = { id: 1, role: 'admin' };
 const editor = { id: 2, role: 'editor' };
 
+let folderInstance;
+
 describe('project-folder routes', () => {
   beforeEach(() => {
     db.sequelize.transaction = vi.fn(async (fn) => fn({ id: 'tx' }));
-    db.Project.count = vi.fn(async () => 2);
+    db.Project.count = vi.fn(async ({ where }) => where.id[Op.in].length);
     db.Project.update = vi.fn(async () => [2]);
     db.ProjectFolder.create = vi.fn(async ({ name }) =>
       db.ProjectFolder.build({ id: 7, name })
@@ -53,9 +57,19 @@ describe('project-folder routes', () => {
       db.ProjectFolder.build({ id: 2, name: 'Zebra' }),
       db.ProjectFolder.build({ id: 1, name: 'Appel' }),
     ]);
+    folderInstance = db.ProjectFolder.build({ id: 5, name: 'Oud' });
+    folderInstance.update = vi.fn(async function (values) {
+      Object.assign(this, values);
+      return this;
+    });
+    folderInstance.destroy = vi.fn(async () => {});
+    db.ProjectFolder.findByPk = vi.fn(async (id) =>
+      id === 5 ? folderInstance : null
+    );
   });
 
   afterEach(() => {
+    db.ProjectFolder.findByPk = originals.findByPk;
     db.sequelize.transaction = originals.transaction;
     db.Project.count = originals.count;
     db.Project.update = originals.update;
@@ -228,6 +242,151 @@ describe('project-folder routes', () => {
 
       expect(res.status).toBe(403);
       expect(db.ProjectFolder.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('DELETE /project-folder/:id', () => {
+    const del = (user, id = 5) =>
+      request(createApp(user)).delete(`/project-folder/${id}`);
+
+    it('deletes the folder for an admin', async () => {
+      const res = await del(admin);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ projectFolder: 'deleted' });
+      expect(folderInstance.destroy).toHaveBeenCalledTimes(1);
+    });
+
+    it('clears folderId before destroying the folder', async () => {
+      await del(admin);
+
+      const clearOrder = db.Project.update.mock.invocationCallOrder[0];
+      const destroyOrder = folderInstance.destroy.mock.invocationCallOrder[0];
+      expect(clearOrder).toBeLessThan(destroyOrder);
+      expect(db.Project.update).toHaveBeenCalledWith(
+        { folderId: null },
+        expect.objectContaining({
+          where: { folderId: 5 },
+          paranoid: false,
+        })
+      );
+    });
+
+    it('uses the same transaction for both writes', async () => {
+      await del(admin);
+
+      const tx = { id: 'tx' };
+      expect(db.sequelize.transaction).toHaveBeenCalledTimes(1);
+      expect(db.Project.update.mock.calls[0][1].transaction).toEqual(tx);
+      expect(folderInstance.destroy).toHaveBeenCalledWith({ transaction: tx });
+    });
+
+    it('does not let an editor delete a folder', async () => {
+      const res = await del(editor);
+
+      expect(res.status).toBe(403);
+      expect(folderInstance.destroy).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 for an unknown folder', async () => {
+      const res = await del(admin, 99);
+
+      expect(res.status).toBe(404);
+      expect(folderInstance.destroy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('PUT /project-folder/:id', () => {
+    const put = (user, body, id = 5) =>
+      request(createApp(user)).put(`/project-folder/${id}`).send(body);
+
+    it('renames without projectIds and leaves the projects untouched', async () => {
+      const res = await put(admin, { name: 'Nieuw' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.name).toBe('Nieuw');
+      expect(db.Project.update).not.toHaveBeenCalled();
+      expect(db.Project.count).not.toHaveBeenCalled();
+    });
+
+    it('moves listed projects in and clears the ones left out', async () => {
+      const res = await put(admin, { name: 'Nieuw', projectIds: [3, 4] });
+
+      expect(res.status).toBe(200);
+      const [clear, add] = db.Project.update.mock.calls;
+      expect(clear[0]).toEqual({ folderId: null });
+      expect(clear[1].where.folderId).toBe(5);
+      expect(clear[1].where.id).toBeDefined();
+      expect(clear[1].paranoid).toBe(false);
+      expect(add[0]).toEqual({ folderId: 5 });
+    });
+
+    it('clears the whole folder for an empty list without Op.notIn', async () => {
+      const res = await put(admin, { name: 'Nieuw', projectIds: [] });
+
+      expect(res.status).toBe(200);
+      expect(db.Project.update).toHaveBeenCalledTimes(1);
+      const [values, options] = db.Project.update.mock.calls[0];
+      expect(values).toEqual({ folderId: null });
+      expect(options.where).toEqual({ folderId: 5 });
+    });
+
+    it('moves a project in that sits in another folder', async () => {
+      const res = await put(admin, { name: 'Nieuw', projectIds: [9] });
+
+      expect(res.status).toBe(200);
+      expect(db.Project.update).toHaveBeenLastCalledWith(
+        { folderId: 5 },
+        expect.objectContaining({ transaction: { id: 'tx' } })
+      );
+      const add = db.Project.update.mock.calls[1][1];
+      expect(add.where.folderId).toBeUndefined();
+    });
+
+    it('rejects an empty name with 400', async () => {
+      const res = await put(admin, { name: ' ', projectIds: [3] });
+
+      expect(res.status).toBe(400);
+      expect(folderInstance.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects an unknown project with 400 and saves nothing', async () => {
+      db.Project.count = vi.fn(async () => 1);
+
+      const res = await put(admin, { name: 'X', projectIds: [3, 999] });
+
+      expect(res.status).toBe(400);
+      expect(folderInstance.update).not.toHaveBeenCalled();
+      expect(db.Project.update).not.toHaveBeenCalled();
+    });
+
+    it('does not let an editor update a folder', async () => {
+      const res = await put(editor, { name: 'Nope' });
+
+      expect(res.status).toBe(403);
+      expect(db.ProjectFolder.findByPk).not.toHaveBeenCalled();
+      expect(folderInstance.update).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 for an unknown folder', async () => {
+      const res = await put(admin, { name: 'X' }, 99);
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('Map niet gevonden');
+    });
+
+    it('uses the same transaction for every write', async () => {
+      await put(admin, { name: 'Nieuw', projectIds: [3] });
+
+      const tx = { id: 'tx' };
+      expect(db.sequelize.transaction).toHaveBeenCalledTimes(1);
+      expect(folderInstance.update).toHaveBeenCalledWith(
+        { name: 'Nieuw' },
+        { transaction: tx }
+      );
+      for (const call of db.Project.update.mock.calls) {
+        expect(call[1].transaction).toEqual(tx);
+      }
     });
   });
 });

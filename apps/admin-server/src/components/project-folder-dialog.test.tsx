@@ -24,7 +24,10 @@ const projects = [
 let container: HTMLElement;
 let root: Root;
 
-function render(onSubmit: (name: string, ids: number[]) => Promise<unknown>) {
+function render(
+  onSubmit: (name: string, ids: number[]) => Promise<unknown>,
+  extra: Partial<React.ComponentProps<typeof ProjectFolderDialog>> = {}
+) {
   act(() => {
     root.render(
       <ProjectFolderDialog
@@ -32,6 +35,7 @@ function render(onSubmit: (name: string, ids: number[]) => Promise<unknown>) {
         onOpenChange={() => {}}
         projects={projects}
         onSubmit={onSubmit}
+        {...extra}
       />
     );
   });
@@ -131,4 +135,58 @@ describe('ProjectFolderDialog', () => {
 
     expect(onSubmit).toHaveBeenCalledWith('Templates', [3, 8]);
   }, 30000);
+
+  describe('edit mode', () => {
+    const editProps = {
+      mode: 'edit' as const,
+      initialName: 'Oude naam',
+      initialProjectIds: [5, 8],
+    };
+
+    it('shows the edit title and the save button', () => {
+      render(vi.fn(), editProps);
+      expect(document.body.textContent).toContain('Map bewerken');
+      expect(document.body.textContent).not.toContain('Map aanmaken');
+      expect(byText('button', 'Opslaan')).toBeDefined();
+    });
+
+    it('prefills the name and the ticked projects', () => {
+      render(vi.fn(), editProps);
+      expect(
+        (document.getElementById('project-folder-name') as HTMLInputElement)
+          .value
+      ).toBe('Oude naam');
+      expect(document.body.textContent).toContain('2 projecten geselecteerd');
+    });
+
+    it('submits the full ticked list', async () => {
+      const onSubmit = vi.fn().mockResolvedValue({});
+      render(onSubmit, editProps);
+
+      setInputValue(
+        document.getElementById('project-folder-name') as HTMLInputElement,
+        'Nieuwe naam'
+      );
+      act(() => {
+        (
+          byText('button', '2 projecten geselecteerd') as HTMLButtonElement
+        ).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      for (const id of [5, 3]) {
+        act(() => {
+          (
+            document.getElementById(
+              `project-folder-project-${id}`
+            ) as HTMLButtonElement
+          ).click();
+        });
+      }
+
+      await act(async () => {
+        (byText('button', 'Opslaan') as HTMLButtonElement).click();
+      });
+
+      expect(onSubmit).toHaveBeenCalledWith('Nieuwe naam', [8, 3]);
+    }, 30000);
+  });
 });

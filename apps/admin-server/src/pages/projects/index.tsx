@@ -1,4 +1,5 @@
 import { SessionContext } from '@/auth-context';
+import { ProjectFolderDeleteDialog } from '@/components/project-folder-delete-dialog';
 import { ProjectFolderDialog } from '@/components/project-folder-dialog';
 import { Button } from '@/components/ui/button';
 import {
@@ -114,8 +115,15 @@ export default function Projects() {
   const sessionData = useContext(SessionContext);
   const isAdmin = !!HasAccess(sessionData);
 
-  const { data: folders, createFolder } = useProjectFolders();
+  const {
+    data: folders,
+    createFolder,
+    updateFolder,
+    deleteFolder,
+  } = useProjectFolders();
   const [folderDialogOpen, setFolderDialogOpen] = useState(false);
+  const [editFolderOpen, setEditFolderOpen] = useState(false);
+  const [deleteFolderOpen, setDeleteFolderOpen] = useState(false);
   const folderParam = Array.isArray(router.query.folder)
     ? router.query.folder[0]
     : router.query.folder;
@@ -262,17 +270,33 @@ export default function Projects() {
           </div>
 
           {folderId !== null && (
-            <nav aria-label="Kruimelpad mappen" className="mb-3 text-sm">
-              <Link href="/projects" className="underline">
-                Alle projecten
-              </Link>
-              <span className="mx-2" aria-hidden="true">
-                /
-              </span>
-              <span aria-current="page" className="font-medium">
-                {openFolder?.name ?? 'Map'}
-              </span>
-            </nav>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <nav aria-label="Kruimelpad mappen" className="text-sm">
+                <Link href="/projects" className="underline">
+                  Alle projecten
+                </Link>
+                <span className="mx-2" aria-hidden="true">
+                  /
+                </span>
+                <span aria-current="page" className="font-medium">
+                  {openFolder?.name ?? 'Map'}
+                </span>
+              </nav>
+              {isAdmin && openFolder && (
+                <div className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setEditFolderOpen(true)}>
+                    Map bewerken
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setDeleteFolderOpen(true)}>
+                    Map verwijderen
+                  </Button>
+                </div>
+              )}
+            </div>
           )}
 
           <div className="p-6 bg-white rounded-md clear-right">
@@ -427,6 +451,32 @@ export default function Projects() {
           projects={data || []}
           onSubmit={createFolder}
         />
+
+        {folderId !== null && openFolder && (
+          <ProjectFolderDialog
+            mode="edit"
+            open={editFolderOpen}
+            onOpenChange={setEditFolderOpen}
+            projects={data || []}
+            initialName={openFolder.name}
+            initialProjectIds={(data || [])
+              .filter((p: any) => p.folderId === folderId)
+              .map((p: any) => p.id)}
+            onSubmit={(name, ids) => updateFolder(folderId, name, ids)}
+          />
+        )}
+
+        {folderId !== null && openFolder && (
+          <ProjectFolderDeleteDialog
+            open={deleteFolderOpen}
+            onOpenChange={setDeleteFolderOpen}
+            folderName={openFolder.name}
+            onConfirm={async () => {
+              await deleteFolder(folderId);
+              router.push('/projects');
+            }}
+          />
+        )}
 
         <Dialog
           open={!!templateSource}

@@ -23,6 +23,9 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   projects: ProjectOption[];
   onSubmit: (name: string, projectIds: number[]) => Promise<unknown>;
+  mode?: 'create' | 'edit';
+  initialName?: string;
+  initialProjectIds?: number[];
 };
 
 export function ProjectFolderDialog({
@@ -30,16 +33,21 @@ export function ProjectFolderDialog({
   onOpenChange,
   projects,
   onSubmit,
+  mode = 'create',
+  initialName = '',
+  initialProjectIds = [],
 }: Props) {
+  const isEdit = mode === 'edit';
   const [name, setName] = useState('');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setName('');
-      setSelectedIds([]);
+      setName(isEdit ? initialName : '');
+      setSelectedIds(isEdit ? initialProjectIds : []);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   function toggle(id: number, checked: boolean) {
@@ -57,10 +65,12 @@ export function ProjectFolderDialog({
     setSaving(true);
     try {
       await onSubmit(name.trim(), selectedIds);
-      toast.success('Map aangemaakt.');
+      toast.success(isEdit ? 'Map opgeslagen.' : 'Map aangemaakt.');
       onOpenChange(false);
     } catch (error) {
-      toast.error('Map aanmaken is niet gelukt.');
+      toast.error(
+        isEdit ? 'Map opslaan is niet gelukt.' : 'Map aanmaken is niet gelukt.'
+      );
     } finally {
       setSaving(false);
     }
@@ -77,9 +87,13 @@ export function ProjectFolderDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent onClick={(e) => e.stopPropagation()}>
         <DialogHeader>
-          <DialogTitle>Map aanmaken</DialogTitle>
+          <DialogTitle>{isEdit ? 'Map bewerken' : 'Map aanmaken'}</DialogTitle>
         </DialogHeader>
-        <p>Maak een map aan om je projecten in te delen zoals jij het wilt.</p>
+        <p>
+          {isEdit
+            ? 'Pas de naam aan en kies welke projecten in deze map staan.'
+            : 'Maak een map aan om je projecten in te delen zoals jij het wilt.'}
+        </p>
 
         <div className="space-y-2">
           <label htmlFor="project-folder-name" className="text-sm font-medium">
@@ -134,7 +148,7 @@ export function ProjectFolderDialog({
         </div>
 
         <Button onClick={submit} disabled={saving || !name.trim()}>
-          {saving ? 'Bezig met opslaan' : 'Map aanmaken'}
+          {saving ? 'Bezig met opslaan' : isEdit ? 'Opslaan' : 'Map aanmaken'}
         </Button>
       </DialogContent>
     </Dialog>
