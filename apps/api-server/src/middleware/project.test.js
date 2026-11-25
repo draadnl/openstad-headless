@@ -45,6 +45,40 @@ describe('bypass paths', () => {
     expect(db.Project.findOne).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['GET', '/api/project-folder'],
+    ['POST', '/api/project-folder'],
+    ['GET', '/api/project-folder/5'],
+  ])('bypasses %s %s (project-folder)', async (method, path) => {
+    db.Project.findOne = vi.fn();
+    const app = createApp();
+
+    const res = await request(app)[method.toLowerCase()](path);
+
+    expect(res.status).toBe(200);
+    expect(res.body.projectId).toBeNull();
+    expect(db.Project.findOne).not.toHaveBeenCalled();
+  });
+
+  it('still rejects /api/project/abc (project-folder skip is not too wide)', async () => {
+    db.Project.findOne = vi.fn();
+    const app = createApp();
+
+    const res = await request(app).get('/api/project/abc');
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('Project niet gevonden');
+  });
+
+  it('does not bypass /api/project-folderx (project-folder)', async () => {
+    db.Project.findOne = vi.fn();
+    const app = createApp();
+
+    const res = await request(app).get('/api/project-folderx');
+
+    expect(res.status).toBe(400);
+  });
+
   it('bypasses GET /api/project (list)', async () => {
     db.Project.findOne = vi.fn();
     const app = createApp();

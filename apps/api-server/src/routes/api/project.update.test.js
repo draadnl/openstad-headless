@@ -88,6 +88,16 @@ describe('PUT project', () => {
 
     expect(updated?.auditIncidentAt).toBeUndefined();
   });
+
+  it('ignores folderId so folders only change through the folder API', async () => {
+    const res = await request(createApp(admin))
+      .put(url)
+      .send({ name: 'Renamed', folderId: 7 });
+
+    expect(res.status).toBe(200);
+    expect(updated).not.toHaveProperty('folderId');
+    expect(updated?.name).toBe('Renamed');
+  });
 });
 
 describe('PUT project syncs canCreateNewUsers to the auth client', () => {

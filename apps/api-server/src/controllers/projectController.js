@@ -541,8 +541,9 @@ async function prepareDuplicationPayload(req, res, next) {
 }
 
 function createProjectRecord(req, res, next) {
+  const { folderId, ...body } = req.body;
   db.Project.create(
-    { emailConfig: {}, ...req.body },
+    { emailConfig: {}, ...body },
     { skipDefaultStatuses: req.skipDefaultStatuses }
   )
     .then((result) => {
@@ -948,7 +949,7 @@ async function updateProjectRecord(req, res, next) {
   if ('url' in req.body && req.body.url != project.url)
     req.pendingMessages.push({ key: `project-urls-update`, value: 'event' });
 
-  let updateBody = req.body;
+  const { folderId, ...updateBody } = req.body;
 
   if (req.body.url && req.body.url !== project.url) {
     try {
@@ -976,7 +977,7 @@ async function updateProjectRecord(req, res, next) {
   }
 
   project
-    .authorizeData(req.body, 'update', req.user)
+    .authorizeData(updateBody, 'update', req.user)
     .update(updateBody)
     .then(async (result) => {
       req.results = result;
