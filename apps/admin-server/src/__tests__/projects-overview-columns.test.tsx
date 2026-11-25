@@ -62,7 +62,12 @@ vi.mock('@/hooks/use-template', () => ({
 }));
 
 vi.mock('@/components/ui/page-layout', () => ({
-  PageLayout: ({ children }: any) => <div>{children}</div>,
+  PageLayout: ({ children, action }: any) => (
+    <div>
+      {action}
+      {children}
+    </div>
+  ),
 }));
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -70,10 +75,10 @@ vi.mock('@/components/ui/page-layout', () => ({
 let container: HTMLDivElement;
 let root: Root;
 
-async function render() {
+async function render(role = 'admin') {
   await act(async () => {
     root.render(
-      <SessionContext.Provider value={{ role: 'admin' } as any}>
+      <SessionContext.Provider value={{ role } as any}>
         <Projects />
       </SessionContext.Provider>
     );
@@ -239,5 +244,16 @@ describe('projects overview columns', () => {
     });
     vi.useRealTimers();
     expect(rows().map((r) => cells(r)[0])).toEqual(['Oud project']);
+  });
+
+  it('shows the new-folder button only to a superuser', async () => {
+    const hasButton = () =>
+      Array.from(container.querySelectorAll('button')).some(
+        (b) => b.textContent === 'Nieuwe map aanmaken'
+      );
+    await render('admin');
+    expect(hasButton()).toBe(false);
+    await render('superuser');
+    expect(hasButton()).toBe(true);
   });
 });

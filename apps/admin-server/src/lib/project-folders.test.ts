@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   findFolderById,
   groupProjectsByFolder,
+  looseProjects,
   parseFolderQuery,
   projectCreateHref,
   sidenavFolderItems,
@@ -73,6 +74,16 @@ describe('groupProjectsByFolder', () => {
     });
     expect(result.folders).toEqual([]);
     expect(result.projects.map((p) => p.id)).toEqual([14, 13, 11, 12, 10]);
+  });
+
+  it('keeps a search inside the opened folder', () => {
+    const result = groupProjectsByFolder(projects, folders, {
+      folderId: 2,
+      hasSearch: true,
+      isAdmin: true,
+    });
+    expect(result.folders).toEqual([]);
+    expect(result.projects.map((p) => p.id)).toEqual([12]);
   });
 
   it('treats a project with an unknown folder as loose', () => {
@@ -172,5 +183,15 @@ describe('findFolderById', () => {
   });
   it('returns the folder for a known id', () => {
     expect(findFolderById(list, 2)).toEqual({ id: 2, name: 'B' });
+  });
+});
+
+describe('looseProjects', () => {
+  it('keeps only projects without a folder', () => {
+    expect(looseProjects(projects).map((p) => p.id)).toEqual([11, 13]);
+  });
+
+  it('handles missing input', () => {
+    expect(looseProjects(undefined as any)).toEqual([]);
   });
 });

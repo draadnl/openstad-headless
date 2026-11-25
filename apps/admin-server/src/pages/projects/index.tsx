@@ -17,6 +17,7 @@ import useTemplates from '@/hooks/use-template';
 import { HasAccess } from '@/lib/hasAccess';
 import {
   groupProjectsByFolder,
+  looseProjects,
   parseFolderQuery,
   projectCreateHref,
 } from '@/lib/project-folders';
@@ -131,7 +132,6 @@ export default function Projects() {
   }, [data, statusFilter, searchTerm, filterSearchType]);
 
   const sessionData = useContext(SessionContext);
-  const isAdmin = !!HasAccess(sessionData);
   const isSuperuser = sessionData?.role === 'superuser';
 
   const {
@@ -220,13 +220,15 @@ export default function Projects() {
         action={
           HasAccess(sessionData) && (
             <div className="flex gap-2">
-              <Button
-                variant="secondary"
-                className="flex w-fit"
-                onClick={() => setFolderDialogOpen(true)}>
-                <Folder size="20" className="hidden lg:flex" />
-                Nieuwe map aanmaken
-              </Button>
+              {isSuperuser && (
+                <Button
+                  variant="secondary"
+                  className="flex w-fit"
+                  onClick={() => setFolderDialogOpen(true)}>
+                  <Folder size="20" className="hidden lg:flex" />
+                  Nieuwe map aanmaken
+                </Button>
+              )}
               <Link href="/projects/create">
                 <Button variant="default" className="flex w-fit">
                   <Plus size="20" className="hidden lg:flex" />
@@ -297,7 +299,7 @@ export default function Projects() {
                   {openFolder?.name ?? 'Map'}
                 </span>
               </nav>
-              {isAdmin && openFolder && (
+              {isSuperuser && openFolder && (
                 <div className="flex gap-2">
                   <Link href={projectCreateHref(openFolder.id)}>
                     <Button variant="default" className="flex w-fit">
@@ -488,7 +490,7 @@ export default function Projects() {
         <ProjectFolderDialog
           open={folderDialogOpen}
           onOpenChange={setFolderDialogOpen}
-          projects={data || []}
+          projects={looseProjects(data || [])}
           onSubmit={createFolder}
         />
 

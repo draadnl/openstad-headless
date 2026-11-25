@@ -33,14 +33,14 @@ export function groupProjectsByFolder<
 ): { folders: FolderRow<F>[]; projects: P[] } {
   const sorted = sortNewestFirst(projects || []);
 
-  if (hasSearch) return { folders: [], projects: sorted };
-
   if (folderId !== null && folderId !== undefined) {
     return {
       folders: [],
       projects: sorted.filter((p) => p.folderId === folderId),
     };
   }
+
+  if (hasSearch) return { folders: [], projects: sorted };
 
   const knownFolderIds = new Set((folders || []).map((f) => f.id));
   const counts = new Map<number, number>();
@@ -60,6 +60,10 @@ export function groupProjectsByFolder<
     .filter((row) => isAdmin || row.count > 0);
 
   return { folders: rows, projects: loose };
+}
+
+export function looseProjects<P extends ProjectLike>(projects: P[]): P[] {
+  return (projects || []).filter((p) => p.folderId == null);
 }
 
 export function parseFolderQuery(
