@@ -30,6 +30,18 @@ module.exports = {
     },
   },
 
+  statistics: {
+    type: 'object',
+    subset: {
+      chartColors: {
+        type: 'arrayOfStrings',
+        default: [],
+        sanitize: (colors) =>
+          colors.filter((c) => /^#[0-9a-fA-F]{6}$/.test(c)).slice(0, 8),
+      },
+    },
+  },
+
   anonymize: {
     type: 'object',
     subset: {

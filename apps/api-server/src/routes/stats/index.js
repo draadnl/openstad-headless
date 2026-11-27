@@ -29,4 +29,7 @@ router.use(
 // get overview of stats
 router.use('/project/:projectId(\\d+)/overview', require('./overview'));
 
+// enquete (survey) answer statistics, per widget
+router.use('/project/:projectId(\\d+)/enquete', require('./enquete'));
+
 module.exports = router;
