@@ -126,6 +126,9 @@ function parseConfig(which, config) {
         ) {
           throw new Error(`project.config: ${key} has an invalid value`);
         }
+        if (typeof options[key].sanitize === 'function') {
+          return (newValue[key] = options[key].sanitize(value[key]));
+        }
         return (newValue[key] = value[key]);
       }
 

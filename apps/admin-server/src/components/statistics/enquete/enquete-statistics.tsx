@@ -1,3 +1,4 @@
+import { ChartColorsPanel } from '@/components/statistics/chart-colors-panel';
 import {
   Select,
   SelectContent,
@@ -170,17 +171,20 @@ export function EnqueteStatistics({
             ))}
           </SelectContent>
         </Select>
-        {summary?.pdfEnabled && summary.questions.length > 0 ? (
-          <button
-            type="button"
-            className="shrink-0 cursor-pointer py-2 text-sm sm:ml-auto disabled:cursor-not-allowed text-[#5b5fc7] underline underline-offset-2 hover:text-[#4347a8]"
-            onClick={downloadAll}
-            disabled={pdfBusy}
-            aria-busy={pdfBusy}
-            aria-label="Alle vragen downloaden als PDF">
-            {pdfBusy ? 'Bezig…' : 'Alles downloaden'}
-          </button>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-4 sm:ml-auto">
+          <ChartColorsPanel />
+          {summary?.pdfEnabled && summary.questions.length > 0 ? (
+            <button
+              type="button"
+              className="shrink-0 cursor-pointer py-2 text-sm disabled:cursor-not-allowed text-[#5b5fc7] underline underline-offset-2 hover:text-[#4347a8]"
+              onClick={downloadAll}
+              disabled={pdfBusy}
+              aria-busy={pdfBusy}
+              aria-label="Alle vragen downloaden als PDF">
+              {pdfBusy ? 'Bezig…' : 'Alles downloaden'}
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {state === 'gone' ? (

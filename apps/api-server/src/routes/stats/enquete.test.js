@@ -131,6 +131,7 @@ describe('GET enquete stats map points', () => {
       { point: { lat: 52.1, lng: 5.9 } },
       { point: '{"lat":52.1,"lng":5.123456789}' },
       { point: '{}' },
+      { point: '"{\\"lat\\":52.3,\\"lng\\":5.4}"' },
     ];
   });
 
@@ -143,6 +144,7 @@ describe('GET enquete stats map points', () => {
       { lat: 52.1, lng: 5.12346 },
       { lat: 52.1, lng: 5.9 },
       { lat: 52.2, lng: 5.3 },
+      { lat: 52.3, lng: 5.4 },
     ]);
     expect(Object.keys(map.points[0]).sort()).toEqual(['lat', 'lng']);
     expect(map.pointsTruncated).toBe(false);

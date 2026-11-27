@@ -147,7 +147,7 @@ describe('PDF download links', () => {
     enabled = true;
     await mount();
     const all = buttonByLabel('Alle vragen downloaden als PDF')!;
-    expect(all.className).toContain('sm:ml-auto');
+    expect(all.parentElement!.className).toContain('sm:ml-auto');
     expect(all.className).toContain('shrink-0');
     expect(all.className).toContain('text-sm');
     expect(all.className).not.toContain('min-h-[44px]');

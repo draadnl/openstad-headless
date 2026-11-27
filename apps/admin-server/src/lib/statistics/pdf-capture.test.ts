@@ -31,6 +31,15 @@ describe('captureBlockHtml', () => {
     expect(block.querySelector('[data-pdf-exclude]')).not.toBeNull();
   });
 
+  it('keeps a custom hex background colour in the captured html', async () => {
+    const html = await captureBlockHtml(
+      el(
+        '<div class="pdf-card"><span style="background-color: #ff0000">a</span></div>'
+      )
+    );
+    expect(html).toMatch(/background-color:\s*(#ff0000|rgb\(255, 0, 0\))/i);
+  });
+
   it('sends no style or link elements', async () => {
     const html = await captureBlockHtml(el('<div class="pdf-card">a</div>'));
     expect(html).not.toMatch(/<(style|link)/i);

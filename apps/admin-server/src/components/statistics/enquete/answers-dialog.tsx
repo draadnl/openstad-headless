@@ -1,3 +1,4 @@
+import { useChartColors } from '@/lib/statistics/chart-palette';
 import {
   FOCUS_RING,
   colorForIndex,
@@ -42,6 +43,7 @@ export function AnswersDialog({
   number: number;
   options: EnqueteOption[];
 }) {
+  const palette = useChartColors();
   const [rows, setRows] = useState<Row[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -93,7 +95,7 @@ export function AnswersDialog({
 
   const colorFor = (answer: string) => {
     const index = options.findIndex((option) => option.label === answer);
-    return index === -1 ? null : colorForIndex(index);
+    return index === -1 ? null : colorForIndex(index, palette);
   };
 
   const fetchAllImages = (signal?: AbortSignal) =>

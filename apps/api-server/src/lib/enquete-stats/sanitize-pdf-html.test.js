@@ -235,6 +235,18 @@ describe('sanitizePdfHtml (stacked, ranking and file markup)', () => {
     expect(out).toContain('min-height:32px');
   });
 
+  it('keeps the matrix table with scope attributes', () => {
+    const out = sanitizePdfHtml(
+      '<table class="pdf-matrix-table"><caption class="pdf-matrix-caption">Vraag 1</caption><thead><tr><td></td><th scope="col">Goed</th></tr></thead>' +
+        '<tbody><tr><th scope="row">Groen</th><td class="pdf-matrix-cell" style="background-color:#a5aaee;color:#000000">67%</td></tr></tbody></table>'
+    );
+    expect(out).toContain('<table class="pdf-matrix-table">');
+    expect(out).toContain('<th scope="col">Goed</th>');
+    expect(out).toContain('<th scope="row">Groen</th>');
+    expect(out).toContain('background-color:#a5aaee;color:#000000');
+    expect(out).toContain('<caption');
+  });
+
   it('keeps ranking grid, bar and axis markup', () => {
     const out = sanitizePdfHtml(
       '<div class="pdf-bars"><div class="pdf-bar-track"><div class="pdf-bar-grid"><div class="pdf-bar-gridline" style="left:50%"></div></div><div class="pdf-bar-fill" style="width:75%;background-color:#5b5fc7"></div></div><div class="pdf-bar-axis"><div class="pdf-bar-ticks"><span class="pdf-bar-tick" style="left:50%">2</span></div></div></div>'

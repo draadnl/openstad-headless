@@ -3,11 +3,16 @@ import React, { useEffect, useState } from 'react';
 interface ColorPickerProps {
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  label?: string;
 }
 
 const isValidHex = (hex: string) => /^#[0-9A-Fa-f]{6}$/.test(hex);
 
-const ColorPicker: React.FC<ColorPickerProps> = ({ value, onChange }) => {
+const ColorPicker: React.FC<ColorPickerProps> = ({
+  value,
+  onChange,
+  label,
+}) => {
   const [textValue, setTextValue] = useState(value || '');
 
   useEffect(() => {
@@ -22,6 +27,7 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ value, onChange }) => {
       style={{ display: 'inline-flex', gap: '8px', alignItems: 'center' }}>
       <input
         type="color"
+        aria-label={label ? `${label} (kleurkiezer)` : undefined}
         value={colorInputValue}
         onChange={(e) => {
           setTextValue(e.target.value);
@@ -31,6 +37,7 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ value, onChange }) => {
       />
       <input
         type="text"
+        aria-label={label ? `${label} (hexcode)` : undefined}
         value={textValue}
         onChange={(e) => {
           setTextValue(e.target.value);

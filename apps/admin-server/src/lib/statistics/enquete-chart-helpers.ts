@@ -5,14 +5,18 @@ export const CHART_COLORS = [
   '#4aa0a4', // teal
   '#9a7bcb', // lavender
   '#3fa22d', // green
-  '#5b9be0', // light blue
+  '#4a8fd8', // light blue
   '#c2521f', // orange
   '#5c7f24', // olive
 ] as const;
 
-export function colorForIndex(index: number): string {
+export function colorForIndex(
+  index: number,
+  palette: readonly string[] = CHART_COLORS
+): string {
+  const list = palette.length > 0 ? palette : CHART_COLORS;
   const safe = Number.isFinite(index) && index >= 0 ? Math.floor(index) : 0;
-  return CHART_COLORS[safe % CHART_COLORS.length];
+  return list[safe % list.length];
 }
 
 export const AXIS_STEP = 20;

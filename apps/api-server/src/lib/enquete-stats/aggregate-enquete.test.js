@@ -369,7 +369,7 @@ describe('matrix stacked', () => {
       { submittedData: { q1: ['1_a', '10_a'] } },
       { submittedData: { q1: ['1_b'] } },
     ]);
-    expect(q.chart).toBe('stacked');
+    expect(q.chart).toBe('matrix');
     expect(q.answeredCount).toBe(3);
     expect(q.legend).toEqual(['Goed', 'Matig']);
     expect(q.rows[0]).toEqual({
@@ -928,6 +928,24 @@ describe('map points', () => {
     expect(parseMapPoint(null)).toBeNull();
     expect(parseMapPoint([1, 2])).toBeNull();
     expect(parseMapPoint({ lat: 1, lng: 2 })).toEqual({ lat: 1, lng: 2 });
+  });
+
+  it('parseMapPoint accepts a double-encoded JSON string', () => {
+    expect(parseMapPoint('"{\\"lat\\":52.1,\\"lng\\":5.2}"')).toEqual({
+      lat: 52.1,
+      lng: 5.2,
+    });
+    expect(parseMapPoint('"not json"')).toBeNull();
+    expect(parseMapPoint('"{}"')).toBeNull();
+  });
+
+  it('details show the coordinates with 5 decimals', () => {
+    const subs = [
+      { id: '1', submittedData: { q1: { lat: 51.6573, lng: 4.89245 } } },
+      { id: '2', submittedData: { q1: '{}' } },
+    ];
+    const details = buildQuestionDetails(mapItem, subs, {});
+    expect(details.rows.map((r) => r.answer)).toEqual(['51.65730, 4.89245']);
   });
 
   it('gives the same count in the details as on the card', () => {

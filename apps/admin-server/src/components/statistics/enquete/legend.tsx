@@ -1,3 +1,4 @@
+import { useChartColors } from '@/lib/statistics/chart-palette';
 import { colorForIndex } from '@/lib/statistics/enquete-chart-helpers';
 
 import type { EnqueteOption } from './types';
@@ -11,6 +12,7 @@ export function Legend({
   options: EnqueteOption[];
   hover?: LegendHover;
 }) {
+  const palette = useChartColors();
   return (
     <ul className="pdf-legend m-0 table list-none p-0">
       {options.map((option, index) => (
@@ -22,7 +24,7 @@ export function Legend({
             <span
               aria-hidden="true"
               className="pdf-dot inline-block h-2.5 w-2.5 shrink-0 rounded-full"
-              style={{ backgroundColor: colorForIndex(index) }}
+              style={{ backgroundColor: colorForIndex(index, palette) }}
             />
           </span>
           <span className="pdf-legend-label table-cell align-middle">

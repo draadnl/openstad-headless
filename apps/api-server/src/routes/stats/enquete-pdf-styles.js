@@ -194,6 +194,32 @@ svg {
   transform: translateX(-50%);
 }
 
+.pdf-matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.pdf-matrix-caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+.pdf-matrix-head {
+  padding: 8px;
+  text-align: center;
+  font-weight: 600;
+}
+.pdf-matrix-rowhead {
+  padding: 8px;
+  text-align: left;
+  font-weight: 400;
+}
+.pdf-matrix-cell {
+  padding: 8px;
+  text-align: center;
+  border: 2px solid #fff;
+}
 .pdf-stacked {
   width: 100%;
 }

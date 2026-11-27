@@ -243,12 +243,14 @@ function buildOpen(item, submissions) {
 function parseMapPoint(raw) {
   let value = raw;
   if (typeof value === 'string') {
-    const text = value.trim();
-    if (!text.startsWith('{')) return null;
-    try {
-      value = JSON.parse(text);
-    } catch (e) {
-      return null;
+    for (let round = 0; round < 2 && typeof value === 'string'; round += 1) {
+      const text = value.trim();
+      if (!text.startsWith('{') && !text.startsWith('"')) return null;
+      try {
+        value = JSON.parse(text);
+      } catch (e) {
+        return null;
+      }
     }
   }
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
@@ -628,7 +630,7 @@ function buildQuestionSummaries(items, submissions) {
     } else if (type === 'matrix') {
       questions.push({
         ...base,
-        chart: 'stacked',
+        chart: 'matrix',
         ...buildMatrixStacked(item, submissions),
       });
     } else if (FILE_TYPES.includes(type)) {
@@ -676,7 +678,10 @@ function makeDetailAnswer(item) {
   }
   // Rows without a real pin are skipped, same as the card count.
   if (type === 'map') {
-    return (raw) => (parseMapPoint(raw) ? 'Locatie gekozen' : null);
+    return (raw) => {
+      const point = parseMapPoint(raw);
+      return point ? `${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}` : null;
+    };
   }
   if (type === 'open') {
     return (raw) => {

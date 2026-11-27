@@ -4,7 +4,9 @@ import { SubmissionsAreaChart } from '@/components/statistics/submissions-area-c
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageLayout } from '@/components/ui/page-layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useProject } from '@/hooks/use-project';
 import { useInViewOnce, useReducedMotion } from '@/lib/statistics/chart-motion';
+import { ChartPaletteProvider } from '@/lib/statistics/chart-palette';
 import {
   type StatsData,
   getCount,
@@ -114,6 +116,7 @@ const subTabClass =
 export default function Statistics() {
   const router = useRouter();
   const { project } = router.query;
+  const { data: projectData } = useProject();
 
   const [stats, setStats] = useState<StatsData>([]);
   const [initialLoad, setInitialLoad] = useState(true);
@@ -285,11 +288,14 @@ export default function Statistics() {
 
                   <TabsContent value="enquetes" className="p-0">
                     <div className="w-full max-w-[1100px] bg-white rounded-md">
-                      <EnqueteStatistics
-                        project={project}
-                        from={format(fromDate, 'yyyy-MM-dd')}
-                        to={format(toDate, 'yyyy-MM-dd')}
-                      />
+                      <ChartPaletteProvider
+                        colors={projectData?.config?.statistics?.chartColors}>
+                        <EnqueteStatistics
+                          project={project}
+                          from={format(fromDate, 'yyyy-MM-dd')}
+                          to={format(toDate, 'yyyy-MM-dd')}
+                        />
+                      </ChartPaletteProvider>
                     </div>
                   </TabsContent>
                 </Tabs>

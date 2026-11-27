@@ -25,7 +25,15 @@ export type EnqueteQuestion = {
   fieldKey: string;
   type: string;
   title: string;
-  chart: 'donut' | 'bar' | 'open' | 'map' | 'stacked' | 'ranking' | 'files';
+  chart:
+    | 'donut'
+    | 'bar'
+    | 'open'
+    | 'map'
+    | 'stacked'
+    | 'matrix'
+    | 'ranking'
+    | 'files';
   answeredCount: number;
   options?: EnqueteOption[];
   legend?: string[];

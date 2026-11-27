@@ -67,6 +67,7 @@ export function AnswersMap({
 }) {
   const [leaflet, setLeaflet] = useState<any>(null);
   const [markerIcon, setMarkerIcon] = useState<any>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -74,7 +75,10 @@ export function AnswersMap({
       .then((module) => {
         if (!cancelled) setLeaflet(module);
       })
-      .catch((error) => console.error('Failed to load react-leaflet', error));
+      .catch((error) => {
+        console.error('Failed to load react-leaflet', error);
+        if (!cancelled) setLoadFailed(true);
+      });
     import('@openstad-headless/leaflet-map/src/marker-icon')
       .then((module) => {
         const MarkerIcon = module.default;
@@ -93,7 +97,10 @@ export function AnswersMap({
           setMarkerIcon(icon);
         }
       })
-      .catch((error) => console.error('Failed to load marker icon', error));
+      .catch((error) => {
+        console.error('Failed to load marker icon', error);
+        if (!cancelled) setLoadFailed(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -144,7 +151,14 @@ export function AnswersMap({
         <span data-pdf-exclude className="sr-only">
           {points.length} locaties
         </span>
-        {ready ? (
+        {loadFailed ? (
+          <p
+            role="alert"
+            className="m-0 flex h-full items-center justify-center p-4 text-center text-sm text-[#6b6b7b]">
+            De kaart kon niet worden geladen. Herlaad de pagina en probeer het
+            opnieuw.
+          </p>
+        ) : ready ? (
           <MapBody
             leaflet={leaflet}
             markerIcon={markerIcon}

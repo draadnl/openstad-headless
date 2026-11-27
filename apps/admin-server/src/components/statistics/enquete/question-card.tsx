@@ -17,6 +17,7 @@ import { BarRows } from './bar-rows';
 import { CHART_HOVER_CSS } from './chart-hover';
 import { DonutRow } from './donut-row';
 import { FileList } from './file-list';
+import { MatrixTable } from './matrix-table';
 import { OpenAnswers } from './open-answers';
 import { RankingRows } from './ranking-rows';
 import { StackedRows } from './stacked-rows';
@@ -106,6 +107,18 @@ function renderBody(
       return (
         <div className="pdf-bars-wrap mt-4">
           <StackedRows
+            legend={question.legend ?? []}
+            rows={question.rows ?? []}
+            number={number}
+          />
+        </div>
+      );
+    case 'matrix':
+      if (question.answeredCount === 0) return noAnswers;
+      return (
+        <div className="pdf-bars-wrap mt-4">
+          <MatrixTable
+            title={question.title}
             legend={question.legend ?? []}
             rows={question.rows ?? []}
             number={number}

@@ -1,3 +1,4 @@
+import { useChartColors } from '@/lib/statistics/chart-palette';
 import {
   axisTicks,
   colorForIndex,
@@ -19,6 +20,7 @@ export function BarRows({
   options: EnqueteOption[];
   ariaLabel: string;
 }) {
+  const palette = useChartColors();
   const axisMax = niceAxisMax(Math.max(0, ...options.map((o) => o.count)));
   const ticks = axisTicks(axisMax);
   const hover = useChartHover();
@@ -59,7 +61,7 @@ export function BarRows({
             <span
               aria-hidden="true"
               className="pdf-dot inline-block h-2.5 w-2.5 shrink-0 rounded-full"
-              style={{ backgroundColor: colorForIndex(index) }}
+              style={{ backgroundColor: colorForIndex(index, palette) }}
             />
             <span className="min-w-0 truncate" title={option.label}>
               {option.label}
@@ -76,7 +78,7 @@ export function BarRows({
               className="pdf-bar-fill absolute left-0 top-1/2 h-3.5 -translate-y-1/2"
               style={{
                 width: `${(option.count / axisMax) * 100}%`,
-                backgroundColor: colorForIndex(index),
+                backgroundColor: colorForIndex(index, palette),
               }}
             />
           </div>

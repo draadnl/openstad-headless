@@ -5,22 +5,25 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AnswersMap } from './answers-map';
 
+const loadState = vi.hoisted(() => ({ fail: false }));
 vi.mock('@/components/maps/load-react-leaflet', () => ({
   loadReactLeaflet: () =>
-    Promise.resolve({
-      MapContainer: ({ children }: any) => <div>{children}</div>,
-      TileLayer: () => null,
-      Polygon: () => null,
-      Marker: ({ children, title }: any) => (
-        <div data-testid="marker" data-title={title}>
-          {children}
-        </div>
-      ),
-      Tooltip: ({ children }: any) => (
-        <span data-testid="tooltip">{children}</span>
-      ),
-      useMap: () => ({ fitBounds: () => {} }),
-    }),
+    loadState.fail
+      ? Promise.reject(new Error('boom'))
+      : Promise.resolve({
+          MapContainer: ({ children }: any) => <div>{children}</div>,
+          TileLayer: () => null,
+          Polygon: () => null,
+          Marker: ({ children, title }: any) => (
+            <div data-testid="marker" data-title={title}>
+              {children}
+            </div>
+          ),
+          Tooltip: ({ children }: any) => (
+            <span data-testid="tooltip">{children}</span>
+          ),
+          useMap: () => ({ fitBounds: () => {} }),
+        }),
 }));
 vi.mock('@openstad-headless/leaflet-map/src/marker-icon', () => ({
   default: () => ({ options: { html: '<svg width="1" height="1"></svg>' } }),
@@ -92,5 +95,24 @@ describe('AnswersMap pin labels', () => {
     expect(note?.textContent).toBe(
       'Deze kaart toont 26 locaties. De pins zijn niet met het toetsenbord te bereiken; gebruik ‘Meer details’ voor alle antwoorden.'
     );
+  });
+});
+
+describe('AnswersMap load failure', () => {
+  it('shows a Dutch error message instead of an empty box', async () => {
+    loadState.fail = true;
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const container = await renderMap(2);
+      expect(container.querySelector('[role=alert]')?.textContent).toContain(
+        'De kaart kon niet worden geladen'
+      );
+      expect(container.querySelectorAll('[data-testid=marker]')).toHaveLength(
+        0
+      );
+    } finally {
+      loadState.fail = false;
+      spy.mockRestore();
+    }
   });
 });

@@ -1,3 +1,4 @@
+import { useChartColors } from '@/lib/statistics/chart-palette';
 import {
   SKIPPED_COLOR,
   colorForIndex,
@@ -20,6 +21,7 @@ export function StackedRows({
   rows: EnqueteStackedRow[];
   number: number;
 }) {
+  const palette = useChartColors();
   const hover = useChartHover();
   // Dilemma key line for the grey part, only when someone skipped.
   const hasSkippedKey =
@@ -59,7 +61,7 @@ export function StackedRows({
                   backgroundColor:
                     index === legend!.length - 1 && label === 'Overgeslagen'
                       ? SKIPPED_COLOR
-                      : colorForIndex(index),
+                      : colorForIndex(index, palette),
                 }}
               />
               {label}
@@ -86,7 +88,9 @@ export function StackedRows({
                     className="pdf-stacked-key-item flex items-center gap-2">
                     <span
                       className="pdf-dot inline-block h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: colorForIndex(sideIndex) }}
+                      style={{
+                        backgroundColor: colorForIndex(sideIndex, palette),
+                      }}
                     />
                     {side}
                   </span>
@@ -123,7 +127,7 @@ export function StackedRows({
                     width: `${segment.percentage}%`,
                     backgroundColor: segment.skipped
                       ? SKIPPED_COLOR
-                      : colorForIndex(index),
+                      : colorForIndex(index, palette),
                   }}
                 />
               ) : null

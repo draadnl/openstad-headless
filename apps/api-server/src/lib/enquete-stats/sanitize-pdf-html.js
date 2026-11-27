@@ -36,6 +36,13 @@ const ALLOWED_TAGS = [
   'polygon',
   'text',
   'tspan',
+  'table',
+  'caption',
+  'thead',
+  'tbody',
+  'tr',
+  'th',
+  'td',
   // Allowed only so the exclusiveFilter below can drop them WITH their content.
   ...DROPPED_WITH_CONTENT,
 ];
@@ -84,6 +91,7 @@ const ALLOWED_ATTRIBUTES = {
     ...SVG_ATTRIBUTES,
   ],
   img: ['src', 'alt', 'width', 'height', 'class', 'style'],
+  th: ['scope'],
 };
 
 // Only plain characters in a style value. No quotes, no backslash, no "@".

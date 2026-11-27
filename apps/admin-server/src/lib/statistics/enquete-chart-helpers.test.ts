@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { contrastRatio } from './contrast';
 import {
   CHART_COLORS,
   DONUT_OUTER,
@@ -72,16 +73,15 @@ describe('donut label placement', () => {
   });
 });
 
-describe('SKIPPED_COLOR', () => {
-  const luminance = (hex: string) => {
-    const [r, g, b] = [1, 3, 5]
-      .map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
-      .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  };
+describe('CHART_COLORS', () => {
+  it.each(CHART_COLORS)('%s has at least 3:1 contrast on white', (color) => {
+    expect(contrastRatio(color, '#ffffff')).toBeGreaterThanOrEqual(3);
+  });
+});
 
+describe('SKIPPED_COLOR', () => {
   it('has at least 3:1 contrast on white', () => {
-    const ratio = 1.05 / (luminance(SKIPPED_COLOR) + 0.05);
+    const ratio = contrastRatio(SKIPPED_COLOR, '#ffffff');
     expect(ratio).toBeGreaterThanOrEqual(3);
   });
 });

@@ -4,6 +4,7 @@ import {
   CHART_ANIMATION_MS,
   useReducedMotion,
 } from '@/lib/statistics/chart-motion';
+import { useChartColors } from '@/lib/statistics/chart-palette';
 import {
   DONUT_INNER,
   DONUT_OUTER,
@@ -30,6 +31,7 @@ export function DonutChart({
   play?: boolean;
   hover?: ReturnType<typeof useChartHover>;
 }) {
+  const palette = useChartColors();
   const data = options.filter((option) => option.count > 0);
   const reduced = useReducedMotion();
   const [running, setRunning] = useState(true);
@@ -100,7 +102,7 @@ export function DonutChart({
             return (
               <Cell
                 key={option.label}
-                fill={colorForIndex(key)}
+                fill={colorForIndex(key, palette)}
                 className="cursor-pointer"
                 {...(props as any)}
                 style={

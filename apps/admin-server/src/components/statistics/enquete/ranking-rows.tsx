@@ -1,3 +1,4 @@
+import { useChartColors } from '@/lib/statistics/chart-palette';
 import {
   colorForIndex,
   rankingBarWidth,
@@ -19,6 +20,7 @@ export function RankingRows({
   options: EnqueteOption[];
   number: number;
 }) {
+  const palette = useChartColors();
   // Tick for place p sits at the end of the bar for average place p.
   const places = Array.from({ length: options.length }, (_, i) => i + 1);
   const tickLeft = (place: number) =>
@@ -57,7 +59,7 @@ export function RankingRows({
               <span
                 aria-hidden="true"
                 className="pdf-dot inline-block h-2.5 w-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: colorForIndex(index) }}
+                style={{ backgroundColor: colorForIndex(index, palette) }}
               />
               <span className="min-w-0 truncate" title={option.label}>
                 {option.label}
@@ -77,7 +79,7 @@ export function RankingRows({
                 className="pdf-bar-fill absolute left-0 top-1/2 h-3.5 -translate-y-1/2"
                 style={{
                   width: `${rankingBarWidth(average, options.length) * 100}%`,
-                  backgroundColor: colorForIndex(index),
+                  backgroundColor: colorForIndex(index, palette),
                 }}
               />
             </div>
